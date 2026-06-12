@@ -29,51 +29,42 @@ const CO2_TERMS = new Set(['co2','carbon','dioxide']);
 // Supports explicit AND / OR operators: "methanol AND copper OR formate"
 // Without operators, falls back to auto-extracting up to 3 key terms AND'd together.
 // Always anchors on CO2 unless the user already mentioned it.
-function buildQuery(cpcCodes, keywords) {
-  if (!keywords) return 'ta=CO2 AND ta=carbonate';
+function buildQuery(cpcCodes, keywords, jurisdictions) {
+  const jFilter = jurisdictions && jurisdictions.length
+    ? ` AND ${jurisdictions.length === 1 ? `pn=${jurisdictions[0]}*` : `(${jurisdictions.map(j => `pn=${j}*`).join(' OR ')})`}`
+    : '';
+
+  if (!keywords) return `ta=CO2 AND ta=carbonate${jFilter}`;
 
   const hasCO2ref = /\bco2\b|\bcarbon.?dioxide\b/i.test(keywords);
 
   // ── Explicit AND/OR mode ───────────────────────────────────────────────────
   if (/\s+(AND|OR)\s+/i.test(keywords)) {
-    // split('a AND b OR c') → ['a', 'AND', 'b', 'OR', 'c']
     const tokens = keywords.split(/\s+(AND|OR)\s+/i);
     const parts = [];
-
     for (let i = 0; i < tokens.length; i++) {
       if (i % 2 === 1) {
         parts.push(tokens[i].toUpperCase());
       } else {
         const words = tokens[i]
-          .replace(/[^\w\s]/g, ' ')
-          .split(/\s+/)
+          .replace(/[^\w\s]/g, ' ').split(/\s+/)
           .map(w => w.toLowerCase())
           .filter(w => w.length > 1 && !STOP.has(w));
-
-        if (words.length === 1) {
-          parts.push(`ta=${words[0]}`);
-        } else if (words.length > 1) {
-          parts.push(`(${words.map(w => `ta=${w}`).join(' AND ')})`);
-        }
+        if (words.length === 1) parts.push(`ta=${words[0]}`);
+        else if (words.length > 1) parts.push(`(${words.map(w => `ta=${w}`).join(' AND ')})`);
       }
     }
-
     const queryStr = parts.filter(Boolean).join(' ');
-    return hasCO2ref ? queryStr : `ta=CO2 AND ${queryStr}`;
+    return (hasCO2ref ? queryStr : `ta=CO2 AND ${queryStr}`) + jFilter;
   }
 
   // ── Free-text mode: auto-extract up to 3 key terms ────────────────────────
   const words = keywords
-    .replace(/[^\w\s]/g, ' ')
-    .split(/\s+/)
+    .replace(/[^\w\s]/g, ' ').split(/\s+/)
     .map(w => w.toLowerCase())
     .filter(w => w.length > 2 && !STOP.has(w));
-
-  const techTerms = words
-    .filter(w => !CO2_TERMS.has(w))
-    .slice(0, 3);
-
-  return ['ta=CO2', ...techTerms.map(t => `ta=${t}`)].join(' AND ');
+  const techTerms = words.filter(w => !CO2_TERMS.has(w)).slice(0, 3);
+  return ['ta=CO2', ...techTerms.map(t => `ta=${t}`)].join(' AND ') + jFilter;
 }
 
 function normalisePatent(doc) {
@@ -139,7 +130,7 @@ module.exports = async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
-  const { cpc_codes, keywords, range = '1-25' } = req.body || {};
+  const { cpc_codes, keywords, range = '1-25', jurisdictions = [] } = req.body || {};
 
   const consumerKey = process.env.EPO_CONSUMER_KEY;
   const consumerSecret = process.env.EPO_CONSUMER_SECRET;
@@ -164,7 +155,7 @@ module.exports = async function handler(req, res) {
   }
 
   // Search
-  const query = buildQuery(cpc_codes, keywords);
+  const query = buildQuery(cpc_codes, keywords, jurisdictions);
   let searchData;
   try {
     const url = `https://ops.epo.org/3.2/rest-services/published-data/search/biblio?q=${encodeURIComponent(query)}&Range=${range}`;

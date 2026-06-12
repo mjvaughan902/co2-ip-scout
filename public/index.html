@@ -153,6 +153,40 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 .chb { background: #fdf1dc; color: #854F0B; }
 .met2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 8px; }
 
+/* Jurisdiction pills */
+.jrow { display: flex; gap: 5px; flex-wrap: wrap; align-items: center; margin-bottom: 10px; }
+.jlbl { font-size: 11px; color: #bbb; margin-right: 2px; }
+.jpill { padding: 3px 10px; font-size: 11px; border: 1px solid #e0deda; border-radius: 20px; cursor: pointer; color: #888; background: #fff; user-select: none; }
+.jpill:hover { border-color: #1D9E75; color: #0F6E56; }
+.jpill.jsel { border-color: #1D9E75; background: #eaf8f2; color: #0F6E56; font-weight: 600; }
+
+/* Provenance panel */
+.prov { background: #fff; border: 1px solid #e4e2dc; border-radius: 10px; padding: 0; margin-bottom: 1rem; overflow: hidden; }
+.prov-hdr { display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; cursor: pointer; user-select: none; }
+.prov-hdr:hover { background: #fafaf8; }
+.prov-title { font-size: 11px; font-weight: 700; letter-spacing: 0.07em; text-transform: uppercase; color: #aaa; display: flex; align-items: center; gap: 8px; }
+.prov-score { font-size: 11px; padding: 2px 9px; border-radius: 20px; font-weight: 600; }
+.prov-high { background: #eaf8f2; color: #0F6E56; }
+.prov-med  { background: #fdf1dc; color: #854F0B; }
+.prov-low  { background: #f0eeea; color: #888; }
+.prov-body { padding: 0 14px 12px; border-top: 1px solid #f0eeea; }
+.prov-bar-wrap { margin: 10px 0 12px; height: 6px; background: #f0eeea; border-radius: 3px; overflow: hidden; display: flex; }
+.prov-bar-epo { height: 6px; background: #1D9E75; }
+.prov-bar-inf { height: 6px; background: #7ecbb5; }
+.prov-bar-ai  { height: 6px; background: #e0deda; }
+.prov-legend { display: flex; gap: 14px; margin-bottom: 10px; }
+.prov-leg { font-size: 10px; color: #aaa; display: flex; align-items: center; gap: 4px; }
+.prov-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.prov-table { width: 100%; border-collapse: collapse; }
+.prov-table td { font-size: 11px; padding: 5px 0; border-bottom: 1px solid #f5f4f0; vertical-align: top; }
+.prov-table tr:last-child td { border-bottom: none; }
+.prov-table td:first-child { color: #666; width: 50%; }
+.prov-table td:last-child { color: #aaa; text-align: right; }
+.prov-tag { font-size: 10px; padding: 1px 6px; border-radius: 10px; white-space: nowrap; }
+.pt-epo { background: #eaf8f2; color: #0F6E56; }
+.pt-inf { background: #e8f4f0; color: #2a8c70; }
+.pt-ai  { background: #f0eeea; color: #888; }
+
 /* Projects */
 .pj-card { background: #fff; border: 1px solid #e4e2dc; border-radius: 8px; padding: 10px 14px; display: flex; align-items: center; gap: 10px; cursor: pointer; margin-bottom: 7px; }
 .pj-card:hover { border-color: #bbb; }
@@ -202,6 +236,16 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
       <button class="btn-p" id="searchBtn" onclick="runSearch()">🔍 Analyse</button>
     </div>
     <div id="queryHint" style="display:none;font-size:11px;color:#888;margin:4px 0 0 2px;">EPO query: <code id="queryHintText"></code></div>
+    <div class="jrow">
+      <span class="jlbl">Jurisdiction:</span>
+      <span class="jpill jsel" id="jp-ALL" onclick="toggleJurisdiction('ALL')">🌍 All</span>
+      <span class="jpill" id="jp-EP"  onclick="toggleJurisdiction('EP')">EP · Europe</span>
+      <span class="jpill" id="jp-US"  onclick="toggleJurisdiction('US')">US · United States</span>
+      <span class="jpill" id="jp-CN"  onclick="toggleJurisdiction('CN')">CN · China</span>
+      <span class="jpill" id="jp-WO"  onclick="toggleJurisdiction('WO')">WO · PCT</span>
+      <span class="jpill" id="jp-JP"  onclick="toggleJurisdiction('JP')">JP · Japan</span>
+      <span class="jpill" id="jp-KR"  onclick="toggleJurisdiction('KR')">KR · Korea</span>
+    </div>
     <div class="trow" id="tagRow">
       <span class="tlbl">Quick starts:</span>
       <span class="tag" onclick="setQ('Propylene carbonate synthesis from CO₂ and propylene oxide organocatalyst')">PC synthesis</span>
@@ -281,6 +325,24 @@ const FAMILIES = [
 let activeFamily=null, cmpA=null, cmpB=null;
 let currentRT='landscape', lastData=null, lastEPO=null;
 let projects=[];
+let selectedJurisdictions=[];  // empty = all
+
+function toggleJurisdiction(code) {
+  if (code === 'ALL') {
+    selectedJurisdictions = [];
+  } else {
+    const i = selectedJurisdictions.indexOf(code);
+    if (i >= 0) selectedJurisdictions.splice(i, 1);
+    else selectedJurisdictions.push(code);
+  }
+  // Update pill styles
+  ['ALL','EP','US','CN','WO','JP','KR'].forEach(c => {
+    const el = document.getElementById('jp-'+c);
+    if (!el) return;
+    const active = c === 'ALL' ? selectedJurisdictions.length === 0 : selectedJurisdictions.includes(c);
+    el.classList.toggle('jsel', active);
+  });
+}
 
 // ── Storage ───────────────────────────────────────────────────────────────────
 // localStorage used here (this is a hosted app, not a Claude artifact)
@@ -359,7 +421,7 @@ async function runSearch() {
   try {
     const epoRes = await fetch(API.search, {
       method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ cpc_codes: cpcCodes, keywords: query, range:'1-25' })
+      body: JSON.stringify({ cpc_codes: cpcCodes, keywords: query, range:'1-25', jurisdictions: selectedJurisdictions })
     });
     if (epoRes.ok) {
       epoData = await epoRes.json();
@@ -497,6 +559,7 @@ function renderLandscape(d) {
     <div class="shdr">Patent status distribution</div>
     <div class="chart-wrap"><canvas id="sch" role="img" aria-label="Estimated patent counts by status"></canvas></div>
     <div class="strat"><div class="strat-lbl">Strategic recommendation</div><div class="strat-txt">${d.strategic_recommendation||''}</div></div>
+    ${renderProvenance(d)}
     <div class="erow">
       <button class="btn-s" onclick="alert('Export feature — send this analysis via the FTO memo prompt below')">📋 FTO memo ↗</button>
       <button class="btn-s" onclick="alert('Open a chat for partnership target analysis')">🤝 Partnership targets ↗</button>
@@ -534,6 +597,66 @@ function renderEPO(epo) {
       <div class="epo-list">${items}</div>
     </div>
     ${assigneeRows?`<div class="shdr" style="margin-top:1rem;">Top assignees in results</div><div style="margin-bottom:1rem;">${assigneeRows}</div>`:''}
+  </div>`;
+}
+
+function renderProvenance(d) {
+  const epo = d._epo;
+  const hasEPO = epo && epo.total_results > 0;
+  const retrieved = epo?.retrieved || 0;
+  const totalEPO = epo?.total_results || 0;
+  const hasAssignees = (epo?.top_assignees||[]).length > 0;
+  const hasYears = Object.keys(epo?.year_distribution||{}).length > 0;
+  const jurisdictions = selectedJurisdictions.length ? selectedJurisdictions.join(', ') : 'All jurisdictions';
+
+  // Score: 3 EPO-direct fields + 2 EPO-derived + 4 AI fields = 9 total
+  const epoPoints  = hasEPO ? (1 + (hasAssignees?1:0) + (hasYears?1:0)) : 0;
+  const infPoints  = hasEPO ? 2 : 0;  // metrics + trend derived from EPO count/years
+  const aiPoints   = 4;                // summary, whitespace, risks, recommendation
+  const total      = epoPoints + infPoints + aiPoints;
+  const epoPct     = Math.round((epoPoints/total)*100);
+  const infPct     = Math.round((infPoints/total)*100);
+  const aiPct      = 100 - epoPct - infPct;
+
+  const scoreLabel = epoPct+infPct >= 55 ? ['High confidence','prov-high']
+                   : epoPct+infPct >= 30 ? ['Partial EPO grounding','prov-med']
+                   : ['AI estimates only','prov-low'];
+
+  const tag = (cls, txt) => `<span class="prov-tag ${cls}">${txt}</span>`;
+  const row = (label, node) => `<tr><td>${label}</td><td>${node}</td></tr>`;
+
+  const epoTag  = tag('pt-epo', '📡 EPO live');
+  const infTag  = tag('pt-inf', '↗ EPO-derived');
+  const aiTag   = tag('pt-ai',  '🤖 AI analysis');
+
+  return `<div class="prov">
+    <div class="prov-hdr" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'block':'none'">
+      <span class="prov-title">Data provenance <span class="prov-score ${scoreLabel[1]}">${scoreLabel[0]}</span></span>
+      <span style="font-size:10px;color:#ccc;">▾ expand</span>
+    </div>
+    <div class="prov-body" style="display:none;">
+      <div class="prov-bar-wrap">
+        <div class="prov-bar-epo" style="width:${epoPct}%"></div>
+        <div class="prov-bar-inf" style="width:${infPct}%"></div>
+        <div class="prov-bar-ai"  style="width:${aiPct}%"></div>
+      </div>
+      <div class="prov-legend">
+        <span class="prov-leg"><span class="prov-dot" style="background:#1D9E75"></span>EPO live data (${epoPct}%)</span>
+        <span class="prov-leg"><span class="prov-dot" style="background:#7ecbb5"></span>EPO-derived estimates (${infPct}%)</span>
+        <span class="prov-leg"><span class="prov-dot" style="background:#e0deda"></span>AI analysis (${aiPct}%)</span>
+      </div>
+      <table class="prov-table">
+        ${row('Patent count', hasEPO ? epoTag+` ${totalEPO.toLocaleString()} records` : aiTag+' estimated')}
+        ${row('Top assignees', hasAssignees ? epoTag+` ${epo.top_assignees.length} organisations` : aiTag+' from training data')}
+        ${row('Filing trend', hasYears ? infTag+' year distribution' : aiTag+' estimated')}
+        ${row('Activity metrics', hasEPO ? infTag+' scaled from EPO count' : aiTag+' estimated')}
+        ${row('Landscape summary', aiTag+' grounded in EPO data')}
+        ${row('Whitespace / risks', aiTag+' strategic analysis')}
+        ${row('Strategic recommendation', aiTag+' strategic analysis')}
+        ${row('Jurisdiction scope', `<span style="font-size:10px;color:#aaa;">${jurisdictions}</span>`)}
+        ${row('EPO records retrieved', `<span style="font-size:10px;color:#aaa;">${retrieved} of 25 requested</span>`)}
+      </table>
+    </div>
   </div>`;
 }
 
