@@ -72,7 +72,7 @@ Return this JSON with ALL fields populated with real, specific content for this 
   "chemistry_family": "the specific CO2 chemistry family name",
   "query_interpretation": "precise 1-2 sentence description of what technology this covers",
   "cpc_codes": ["C07D317 — cyclic carbonates and lactones", "B01J31 — catalysts", "C07C68 — carbonate esters"],
-  "landscape_summary": "First paragraph: overall density and maturity of this patent space, naming key players.\nSecond paragraph: main technical approaches and their IP status.\nThird paragraph: recent filing momentum, emerging directions, and freedom-to-operate outlook.",
+  "landscape_summary": "First paragraph: overall density and maturity of this patent space, naming key players and dominant technical approaches.\nSecond paragraph: recent filing momentum, emerging directions, and freedom-to-operate outlook.",
   "filing_trend": "rising",
   "estimated_active_patents": 450,
   "estimated_expired_patents": 280,
@@ -81,29 +81,24 @@ Return this JSON with ALL fields populated with real, specific content for this 
   "data_source": "${dataSource}",
   "whitespace_opportunities": [
     {"title": "Specific opportunity title", "description": "2-sentence description of this filing opportunity and why it exists.", "strength": "high"},
-    {"title": "Specific opportunity title", "description": "2-sentence description.", "strength": "high"},
     {"title": "Specific opportunity title", "description": "2-sentence description.", "strength": "medium"},
     {"title": "Specific opportunity title", "description": "2-sentence description.", "strength": "low"}
   ],
   "blocking_risks": [
     {"title": "Specific risk title", "description": "2-sentence description of this blocking risk and who holds it.", "severity": "high"},
-    {"title": "Specific risk title", "description": "2-sentence description.", "severity": "medium"},
-    {"title": "Specific risk title", "description": "2-sentence description.", "severity": "low"}
+    {"title": "Specific risk title", "description": "2-sentence description.", "severity": "medium"}
   ],
   "top_assignees": [
     {"name": "Real company or institution name", "type": "corporate", "patent_count": 145, "focus": "specific focus area"},
     {"name": "Real university name", "type": "academic", "patent_count": 89, "focus": "specific focus area"},
     {"name": "Real company name", "type": "corporate", "patent_count": 67, "focus": "specific focus area"},
     {"name": "Real lab name", "type": "national_lab", "patent_count": 43, "focus": "specific focus area"},
-    {"name": "Real company name", "type": "corporate", "patent_count": 31, "focus": "specific focus area"},
-    {"name": "Real university name", "type": "academic", "patent_count": 22, "focus": "specific focus area"}
+    {"name": "Real company name", "type": "corporate", "patent_count": 31, "focus": "specific focus area"}
   ],
   "representative_patents": [
     {"title": "Real descriptive patent title", "assignee": "Real assignee", "year": 2021, "status": "active", "abstract": "2-sentence description of what this patent covers.", "number": "EP3456789"},
     {"title": "Real descriptive patent title", "assignee": "Real assignee", "year": 2018, "status": "active", "abstract": "2-sentence description.", "number": "WO2018123456"},
-    {"title": "Real descriptive patent title", "assignee": "Real assignee", "year": 2015, "status": "active", "abstract": "2-sentence description.", "number": "EP2987654"},
-    {"title": "Real descriptive patent title", "assignee": "Real assignee", "year": 2008, "status": "expired", "abstract": "2-sentence description.", "number": "EP1234567"},
-    {"title": "Real descriptive patent title", "assignee": "Real assignee", "year": 2023, "status": "filed", "abstract": "2-sentence description.", "number": "WO2023987654"}
+    {"title": "Real descriptive patent title", "assignee": "Real assignee", "year": 2008, "status": "expired", "abstract": "2-sentence description.", "number": "EP1234567"}
   ],
   "strategic_recommendation": "Three sentences: (1) FTO posture for this space, (2) highest priority filing areas, (3) best partnership or licensing angle."
 }`;
@@ -124,7 +119,7 @@ Return this JSON with ALL fields populated with real, specific content for this 
       },
       body: JSON.stringify({
         model: 'claude-sonnet-4-6',
-        max_tokens: 3000,
+        max_tokens: 2000,
         stream: true,
         system,
         messages: [{ role: 'user', content: user }]
