@@ -179,6 +179,7 @@ module.exports = async function handler(req, res) {
       ? exchangeDocsArr.flatMap(ed => ensureArray(ed?.['exchange-document']))
       : ensureArray(results?.['exchange-document']);
     const patents = docList.map(normalisePatent).filter(Boolean);
+    const effectiveTotal = Math.max(totalCount, patents.length);
 
     const assigneeMap = {};
     patents.forEach(p => {
@@ -195,7 +196,7 @@ module.exports = async function handler(req, res) {
     patents.forEach(p => { if (p.year) yearDist[p.year] = (yearDist[p.year] || 0) + 1; });
 
     return res.status(200).json({
-      total_results: totalCount,
+      total_results: effectiveTotal,
       query_used: query,
       patents,
       top_assignees: topAssignees,
