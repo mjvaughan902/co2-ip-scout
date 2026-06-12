@@ -30,7 +30,15 @@ module.exports = async function handler(req, res) {
       );
       const searchData = await searchRes.json();
       const totalCount = parseInt(searchData?.['ops:world-patent-data']?.['ops:biblio-search']?.['@total-result-count'] || '0');
-      searchResult = { status: searchRes.status, ok: searchRes.ok, total_results: totalCount, query: queryUsed };
+      const searchResult2 = searchData?.['ops:world-patent-data']?.['ops:biblio-search']?.['ops:search-result'];
+      searchResult = {
+        status: searchRes.status,
+        ok: searchRes.ok,
+        total_results: totalCount,
+        query: queryUsed,
+        search_result_keys: searchResult2 ? Object.keys(searchResult2) : null,
+        raw_search_result: searchResult2
+      };
     }
   } catch(e) {
     tokenResult = { error: e.message };
