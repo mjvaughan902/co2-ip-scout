@@ -75,6 +75,7 @@ function normalisePatent(doc) {
 
     const appParties = biblio['parties']?.['applicants']?.['applicant'] || [];
     const assignees = ensureArray(appParties)
+      .filter(a => a?.['@data-format'] === 'epodoc')
       .map(a => extractText(a?.['applicant-name']?.['name']))
       .filter(Boolean);
 
@@ -172,7 +173,10 @@ module.exports = async function handler(req, res) {
   try {
     const results = searchData?.['ops:world-patent-data']?.['ops:biblio-search']?.['ops:search-result'];
     const totalCount = parseInt(searchData?.['ops:world-patent-data']?.['ops:biblio-search']?.['@total-result-count'] || '0');
-    const docList = ensureArray(results?.['exchange-documents']?.['exchange-document'] || results?.['exchange-document']);
+    const exchangeDocsArr = ensureArray(results?.['exchange-documents']);
+    const docList = exchangeDocsArr.length
+      ? exchangeDocsArr.flatMap(ed => ensureArray(ed?.['exchange-document']))
+      : ensureArray(results?.['exchange-document']);
     const patents = docList.map(normalisePatent).filter(Boolean);
 
     const assigneeMap = {};
