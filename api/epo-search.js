@@ -56,13 +56,8 @@ function buildQuery(cpcCodes, keywords) {
     queryParts.push(`ta=${term}`);
   });
 
-  // If CPC codes available, add one as extra filter
-  if (cpcCodes && cpcCodes.length > 0) {
-    const code = cpcCodes[0].split(' ')[0].replace(/[^A-Z0-9/]/gi, '');
-    if (code && code.length > 3) {
-      queryParts.push(`cpc=${code}`);
-    }
-  }
+  // CPC codes kept for display/classification but NOT added to the query —
+  // ANDing a CPC with 2 keyword terms over-constrains and returns 0 for most families
 
   return queryParts.join(' AND ');
 }
@@ -173,13 +168,23 @@ module.exports = async function handler(req, res) {
 
   // Parse
   try {
-    const results = searchData?.['ops:world-patent-data']?.['ops:biblio-search']?.['ops:search-result'];
-    const totalCount = parseInt(searchData?.['ops:world-patent-data']?.['ops:biblio-search']?.['@total-result-count'] || '0');
-    const exchangeDocsArr = ensureArray(results?.['exchange-documents']);
+    const bibSearch = searchData?.['ops:world-patent-data']?.['ops:biblio-search'];
+    const results = bibSearch?.['ops:search-result'];
+    const totalCount = parseInt(bibSearch?.['@total-result-count'] || '0');
+
+    // exchange-documents can be an array of wrappers or a single wrapper object
+    const rawExDocs = results?.['exchange-documents'];
+    const exchangeDocsArr = Array.isArray(rawExDocs) ? rawExDocs : (rawExDocs ? [rawExDocs] : []);
     const docList = exchangeDocsArr.length
       ? exchangeDocsArr.flatMap(ed => ensureArray(ed?.['exchange-document']))
       : ensureArray(results?.['exchange-document']);
-    const patents = docList.map(normalisePatent).filter(Boolean);
+
+    const parseErrors = [];
+    const patents = docList.map((doc, i) => {
+      const r = normalisePatent(doc);
+      if (!r) parseErrors.push(i);
+      return r;
+    }).filter(Boolean);
     const effectiveTotal = Math.max(totalCount, patents.length);
 
     const assigneeMap = {};
@@ -202,9 +207,10 @@ module.exports = async function handler(req, res) {
       patents,
       top_assignees: topAssignees,
       year_distribution: yearDist,
-      retrieved: patents.length
+      retrieved: patents.length,
+      _debug: { totalCount, docListLen: docList.length, parseErrors }
     });
   } catch (err) {
-    return res.status(200).json({ error: 'Parse failed', detail: err.message, total_results: 0, patents: [] });
+    return res.status(200).json({ error: 'Parse failed', detail: err.message, total_results: 0, patents: [], _debug: { stage: 'parse', raw_keys: Object.keys(searchData || {}) } });
   }
 };
