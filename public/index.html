@@ -198,9 +198,10 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
     <div class="slbl">Chemistry family</div>
     <div class="fgrid" id="famGrid"></div>
     <div class="srow">
-      <input class="sinput" id="qIn" type="text" placeholder="Select a chemistry family above, or describe your technology directly…" />
+      <input class="sinput" id="qIn" type="text" placeholder="Describe your technology — use AND / OR for precise queries, e.g. "methanol AND copper OR formate"" />
       <button class="btn-p" id="searchBtn" onclick="runSearch()">🔍 Analyse</button>
     </div>
+    <div id="queryHint" style="display:none;font-size:11px;color:#888;margin:4px 0 0 2px;">EPO query: <code id="queryHintText"></code></div>
     <div class="trow" id="tagRow">
       <span class="tlbl">Quick starts:</span>
       <span class="tag" onclick="setQ('Propylene carbonate synthesis from CO₂ and propylene oxide organocatalyst')">PC synthesis</span>
@@ -368,6 +369,10 @@ async function runSearch() {
         const badge = document.getElementById('dataBadge');
         badge.className='data-badge db-live';
         badge.textContent=`Live EPO · ${epoTotal.toLocaleString()} patents found`;
+      }
+      if (epoData.query_used) {
+        document.getElementById('queryHint').style.display='block';
+        document.getElementById('queryHintText').textContent = epoData.query_used;
       }
     }
   } catch(e) { console.warn('EPO search failed:', e.message); }

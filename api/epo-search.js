@@ -15,51 +15,65 @@ function extractText(obj) {
   return '';
 }
 
-// Build a well-targeted CQL query for EPO OPS
-// Strategy: take 2-3 highly specific terms from the query and AND them
-// with a CO2 anchor term to keep results focused but not empty
+// Pure function words — technical terms like 'catalyst', 'synthesis' are kept
+const STOP = new Set([
+  'a','an','the','and','or','for','of','in','to','is','are','was','were',
+  'it','its','be','been','being','that','this','with','from','into',
+  'via','over','under','after','before','through','using','based',
+  'have','has','had','will','would','could','should','may','might'
+]);
+
+const CO2_TERMS = new Set(['co2','carbon','dioxide']);
+
+// Build an EPO CQL query from the user's keywords.
+// Supports explicit AND / OR operators: "methanol AND copper OR formate"
+// Without operators, falls back to auto-extracting up to 3 key terms AND'd together.
+// Always anchors on CO2 unless the user already mentioned it.
 function buildQuery(cpcCodes, keywords) {
   if (!keywords) return 'ta=CO2 AND ta=carbonate';
 
-  // Stopwords to exclude
-  const stop = new Set([
-    'from','with','that','this','into','using','based','have','been','will',
-    'and','for','the','via','over','under','after','before','through',
-    'synthesis','synthetic','preparation','process','method','production',
-    'catalyst','catalytic','catalysis','reaction','reactions',
-    'study','studies','review','novel','new','improved','efficient'
-  ]);
+  const hasCO2ref = /\bco2\b|\bcarbon.?dioxide\b/i.test(keywords);
 
-  // Extract meaningful technical terms
+  // ── Explicit AND/OR mode ───────────────────────────────────────────────────
+  if (/\s+(AND|OR)\s+/i.test(keywords)) {
+    // split('a AND b OR c') → ['a', 'AND', 'b', 'OR', 'c']
+    const tokens = keywords.split(/\s+(AND|OR)\s+/i);
+    const parts = [];
+
+    for (let i = 0; i < tokens.length; i++) {
+      if (i % 2 === 1) {
+        parts.push(tokens[i].toUpperCase());
+      } else {
+        const words = tokens[i]
+          .replace(/[^\w\s]/g, ' ')
+          .split(/\s+/)
+          .map(w => w.toLowerCase())
+          .filter(w => w.length > 1 && !STOP.has(w));
+
+        if (words.length === 1) {
+          parts.push(`ta=${words[0]}`);
+        } else if (words.length > 1) {
+          parts.push(`(${words.map(w => `ta=${w}`).join(' AND ')})`);
+        }
+      }
+    }
+
+    const queryStr = parts.filter(Boolean).join(' ');
+    return hasCO2ref ? queryStr : `ta=CO2 AND ${queryStr}`;
+  }
+
+  // ── Free-text mode: auto-extract up to 3 key terms ────────────────────────
   const words = keywords
     .replace(/[^\w\s]/g, ' ')
     .split(/\s+/)
     .map(w => w.toLowerCase())
-    .filter(w => w.length > 3 && !stop.has(w));
+    .filter(w => w.length > 2 && !STOP.has(w));
 
-  // Always anchor on CO2 variants
-  const co2Terms = ['CO2', 'carbon dioxide', 'CO₂'];
-  const hasCO2 = words.some(w => ['co2','carbon','dioxide'].includes(w));
-
-  // Pick 2 most specific remaining terms
   const techTerms = words
-    .filter(w => !['co2','carbon','dioxide','oxide','carbon'].includes(w))
-    .slice(0, 2);
+    .filter(w => !CO2_TERMS.has(w))
+    .slice(0, 3);
 
-  const queryParts = [];
-
-  // CO2 anchor
-  queryParts.push('ta=CO2');
-
-  // Add up to 2 specific technical terms
-  techTerms.forEach(term => {
-    queryParts.push(`ta=${term}`);
-  });
-
-  // CPC codes kept for display/classification but NOT added to the query —
-  // ANDing a CPC with 2 keyword terms over-constrains and returns 0 for most families
-
-  return queryParts.join(' AND ');
+  return ['ta=CO2', ...techTerms.map(t => `ta=${t}`)].join(' AND ');
 }
 
 function normalisePatent(doc) {
