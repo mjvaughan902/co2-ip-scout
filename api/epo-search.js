@@ -70,7 +70,8 @@ function buildQuery(cpcCodes, keywords) {
 function normalisePatent(doc) {
   try {
     const biblio = doc['exchange-document']?.['bibliographic-data'] || doc['bibliographic-data'] || {};
-    const titles = ensureArray(biblio['invention-title']);
+    const titleSrc = biblio['invention-title'] || doc['invention-title'];
+    const titles = ensureArray(titleSrc);
     const title = titles.map(t => extractText(t)).filter(Boolean)[0] || 'Untitled';
 
     const appParties = biblio['parties']?.['applicants']?.['applicant'] || [];
@@ -99,7 +100,7 @@ function normalisePatent(doc) {
       .filter(c => c.length > 2)
       .slice(0, 3);
 
-    const abstractSection = doc['exchange-document']?.['abstract'] || doc['abstract'];
+    const abstractSection = doc['exchange-document']?.['abstract'] || doc['abstract'] || biblio['abstract'];
     const abstractParts = ensureArray(abstractSection);
     const abstract = abstractParts
       .map(a => extractText(a?.p || a))
