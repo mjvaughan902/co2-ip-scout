@@ -1,3 +1,5 @@
+// api/ai-stream.js
+// Streams AI landscape analysis grounded in real EPO patent data
 const fetch = require('node-fetch');
 
 module.exports = async function handler(req, res) {
@@ -13,51 +15,100 @@ module.exports = async function handler(req, res) {
   const { query, family_id, real_patent_data } = req.body || {};
   if (!query) return res.status(400).json({ error: 'query required' });
 
-  // Build rich EPO context from real data
+  // Build EPO grounding context
   let epoContext = '';
   let dataSource = 'AI estimate';
-  if (real_patent_data && real_patent_data.total_results) {
+  const hasRealData = real_patent_data && real_patent_data.total_results && real_patent_data.total_results > 0;
+
+  if (hasRealData) {
     dataSource = 'EPO OPS live data';
+    const total = real_patent_data.total_results;
+
     const assignees = (real_patent_data.top_assignees || [])
       .slice(0, 8)
       .map(a => `${a.name} (${a.count} patents)`)
       .join(', ');
+
     const years = real_patent_data.year_distribution || {};
-    const yearSummary = Object.entries(years)
-      .sort((a, b) => b[0] - a[0])
-      .slice(0, 6)
-      .map(([y, n]) => `${y}: ${n}`)
+    const recentYears = Object.entries(years)
+      .sort((a, b) => parseInt(b[0]) - parseInt(a[0]))
+      .slice(0, 8)
+      .map(([y, n]) => `${y}:${n}`)
       .join(', ');
-    const titles = (real_patent_data.sample_patents || [])
-      .slice(0, 6)
-      .map(p => `"${p.title}" (${p.assignee}, ${p.year})`)
-      .join('; ');
+
+    const sampleTitles = (real_patent_data.sample_patents || [])
+      .slice(0, 8)
+      .filter(p => p.title && p.title !== 'Untitled')
+      .map(p => `"${p.title}" — ${p.assignee || 'Unknown'} (${p.year || '?'})`)
+      .join('\n  ');
 
     epoContext = `
 
-LIVE EPO PATENT DATA (use this to ground your analysis):
-- Total patents found in EPO database: ${real_patent_data.total_results}
-- Top assignees by filing volume: ${assignees}
-- Recent filing activity by year: ${yearSummary}
-- Representative patent titles from database: ${titles}
+LIVE EPO DATABASE RESULTS — ground your entire analysis in this real data:
+Total patents retrieved: ${total}
+Top assignees: ${assignees}
+Filing activity by year: ${recentYears}
+Sample patent records:
+  ${sampleTitles}
 
-Base your estimated_active_patents on the EPO total of ${real_patent_data.total_results}.
-Reference the actual assignees found in your top_assignees analysis.
-Use the filing year distribution to determine the filing_trend.`;
+INSTRUCTIONS:
+- Set estimated_active_patents to approximately ${Math.round(total * 0.65)}
+- Set estimated_expired_patents to approximately ${Math.round(total * 0.25)}
+- Set estimated_pending to approximately ${Math.round(total * 0.10)}
+- Use the actual assignee names above in your top_assignees list
+- Determine filing_trend from the year distribution (rising if recent years higher)
+- Reference real patterns you see in the patent titles in your landscape_summary`;
   }
 
-  const system = `You are a specialist patent intelligence analyst with deep expertise in CO2 utilisation and carbon conversion chemistry, covering all major families: cyclic/linear carbonates, carboxylation reactions, CO2-to-fuels, mineralisation, polymer synthesis, C1 feedstock routes, electrochemical CO2 reduction, and photocatalytic conversion.
+  const system = `You are a specialist patent intelligence analyst with deep expertise in CO2 utilisation and carbon conversion chemistry. You provide accurate, specific, domain-expert analysis grounded in real data when provided.
 
-Your analysis must be accurate, specific, and grounded in real domain knowledge. When live EPO data is provided, use it directly — reference actual assignees, real filing trends, and real patent counts.
-
-Return ONLY a single valid JSON object. No markdown fences, no preamble, no explanation. The JSON must be complete and valid. Keep individual text fields concise (2-3 sentences max) to ensure the response completes within limits.`;
+CRITICAL: Return ONLY a single complete valid JSON object. No markdown, no preamble, no explanation before or after the JSON. Every numeric field must contain a real non-zero integer. Every string field must contain real specific content — never return placeholder text like "string" or "paragraph".`;
 
   const user = `Analyse the CO2 utilisation patent landscape for: "${query}"${epoContext}
 
-Return this exact JSON structure with all fields populated with real, accurate content:
-{"chemistry_family":"string","query_interpretation":"string","cpc_codes":["string","string","string"],"landscape_summary":"paragraph1\\nparagraph2\\nparagraph3","filing_trend":"rising","estimated_active_patents":0,"estimated_expired_patents":0,"estimated_pending":0,"activity_score":0,"data_source":"${dataSource}","whitespace_opportunities":[{"title":"string","description":"string","strength":"high"},{"title":"string","description":"string","strength":"high"},{"title":"string","description":"string","strength":"medium"},{"title":"string","description":"string","strength":"low"}],"blocking_risks":[{"title":"string","description":"string","severity":"high"},{"title":"string","description":"string","severity":"medium"},{"title":"string","description":"string","severity":"low"}],"top_assignees":[{"name":"string","type":"corporate","patent_count":0,"focus":"string"},{"name":"string","type":"academic","patent_count":0,"focus":"string"},{"name":"string","type":"corporate","patent_count":0,"focus":"string"},{"name":"string","type":"national_lab","patent_count":0,"focus":"string"},{"name":"string","type":"corporate","patent_count":0,"focus":"string"},{"name":"string","type":"academic","patent_count":0,"focus":"string"}],"representative_patents":[{"title":"string","assignee":"string","year":2020,"status":"active","abstract":"string","number":"string"},{"title":"string","assignee":"string","year":2018,"status":"active","abstract":"string","number":"string"},{"title":"string","assignee":"string","year":2015,"status":"active","abstract":"string","number":"string"},{"title":"string","assignee":"string","year":2010,"status":"expired","abstract":"string","number":"string"},{"title":"string","assignee":"string","year":2022,"status":"filed","abstract":"string","number":"string"}],"strategic_recommendation":"string"}`;
+Return this JSON with ALL fields populated with real, specific content for this exact technology:
 
-  // Set streaming headers
+{
+  "chemistry_family": "the specific CO2 chemistry family name",
+  "query_interpretation": "precise 1-2 sentence description of what technology this covers",
+  "cpc_codes": ["C07D317 — cyclic carbonates and lactones", "B01J31 — catalysts", "C07C68 — carbonate esters"],
+  "landscape_summary": "First paragraph: overall density and maturity of this patent space, naming key players.\nSecond paragraph: main technical approaches and their IP status.\nThird paragraph: recent filing momentum, emerging directions, and freedom-to-operate outlook.",
+  "filing_trend": "rising",
+  "estimated_active_patents": 450,
+  "estimated_expired_patents": 280,
+  "estimated_pending": 120,
+  "activity_score": 6,
+  "data_source": "${dataSource}",
+  "whitespace_opportunities": [
+    {"title": "Specific opportunity title", "description": "2-sentence description of this filing opportunity and why it exists.", "strength": "high"},
+    {"title": "Specific opportunity title", "description": "2-sentence description.", "strength": "high"},
+    {"title": "Specific opportunity title", "description": "2-sentence description.", "strength": "medium"},
+    {"title": "Specific opportunity title", "description": "2-sentence description.", "strength": "low"}
+  ],
+  "blocking_risks": [
+    {"title": "Specific risk title", "description": "2-sentence description of this blocking risk and who holds it.", "severity": "high"},
+    {"title": "Specific risk title", "description": "2-sentence description.", "severity": "medium"},
+    {"title": "Specific risk title", "description": "2-sentence description.", "severity": "low"}
+  ],
+  "top_assignees": [
+    {"name": "Real company or institution name", "type": "corporate", "patent_count": 145, "focus": "specific focus area"},
+    {"name": "Real university name", "type": "academic", "patent_count": 89, "focus": "specific focus area"},
+    {"name": "Real company name", "type": "corporate", "patent_count": 67, "focus": "specific focus area"},
+    {"name": "Real lab name", "type": "national_lab", "patent_count": 43, "focus": "specific focus area"},
+    {"name": "Real company name", "type": "corporate", "patent_count": 31, "focus": "specific focus area"},
+    {"name": "Real university name", "type": "academic", "patent_count": 22, "focus": "specific focus area"}
+  ],
+  "representative_patents": [
+    {"title": "Real descriptive patent title", "assignee": "Real assignee", "year": 2021, "status": "active", "abstract": "2-sentence description of what this patent covers.", "number": "EP3456789"},
+    {"title": "Real descriptive patent title", "assignee": "Real assignee", "year": 2018, "status": "active", "abstract": "2-sentence description.", "number": "WO2018123456"},
+    {"title": "Real descriptive patent title", "assignee": "Real assignee", "year": 2015, "status": "active", "abstract": "2-sentence description.", "number": "EP2987654"},
+    {"title": "Real descriptive patent title", "assignee": "Real assignee", "year": 2008, "status": "expired", "abstract": "2-sentence description.", "number": "EP1234567"},
+    {"title": "Real descriptive patent title", "assignee": "Real assignee", "year": 2023, "status": "filed", "abstract": "2-sentence description.", "number": "WO2023987654"}
+  ],
+  "strategic_recommendation": "Three sentences: (1) FTO posture for this space, (2) highest priority filing areas, (3) best partnership or licensing angle."
+}`;
+
+  // Set SSE streaming headers
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache');
   res.setHeader('Connection', 'keep-alive');
@@ -87,8 +138,8 @@ Return this exact JSON structure with all fields populated with real, accurate c
       return;
     }
 
-    // Stream response body line by line
     let fullText = '';
+
     response.body.on('data', chunk => {
       const lines = chunk.toString().split('\n');
       for (const line of lines) {
@@ -99,42 +150,67 @@ Return this exact JSON structure with all fields populated with real, accurate c
           const event = JSON.parse(data);
           if (event.type === 'content_block_delta' && event.delta?.text) {
             fullText += event.delta.text;
-            // Stream each chunk to the browser
             res.write(`data: ${JSON.stringify({ type: 'delta', text: event.delta.text })}\n\n`);
           }
-        } catch(e) { /* skip malformed lines */ }
+        } catch(e) { /* skip malformed */ }
       }
     });
 
     response.body.on('end', () => {
-      // Parse the complete accumulated JSON
       const cleaned = fullText.replace(/```json|```/g, '').trim();
+
+      // Try direct parse
       try {
         const parsed = JSON.parse(cleaned);
         res.write(`data: ${JSON.stringify({ type: 'complete', data: parsed })}\n\n`);
-      } catch(e) {
-        // Try to recover truncated JSON
-        let fixed = cleaned;
-        const opens  = (fixed.match(/\{/g) || []).length;
-        const closes = (fixed.match(/\}/g) || []).length;
-        if (opens > closes) {
-          const lastPatents = fixed.lastIndexOf('"representative_patents"');
-          if (lastPatents > 0) {
-            fixed = fixed.slice(0, lastPatents) + '"representative_patents":[],"strategic_recommendation":"See landscape summary above for strategic guidance."}';
-          } else {
-            fixed += '}'.repeat(opens - closes);
+        res.end();
+        return;
+      } catch(e) {}
+
+      // Try to find JSON object in response
+      const jsonMatch = cleaned.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        try {
+          const parsed = JSON.parse(jsonMatch[0]);
+          res.write(`data: ${JSON.stringify({ type: 'complete', data: parsed })}\n\n`);
+          res.end();
+          return;
+        } catch(e) {}
+      }
+
+      // Truncation recovery — close at last complete top-level field
+      const opens = (cleaned.match(/\{/g) || []).length;
+      const closes = (cleaned.match(/\}/g) || []).length;
+      if (opens > closes) {
+        // Find last safely-completed section and close there
+        const checkpoints = [
+          '"strategic_recommendation"',
+          '"representative_patents"',
+          '"top_assignees"',
+          '"blocking_risks"',
+          '"whitespace_opportunities"'
+        ];
+        for (const cp of checkpoints) {
+          const idx = cleaned.lastIndexOf(cp);
+          if (idx > 0) {
+            // Find end of this field's value
+            let fixed = cleaned.slice(0, idx);
+            // Close with minimal valid fields
+            const tail = cp === '"strategic_recommendation"'
+              ? `${cp}:"See landscape summary for strategic guidance."}`
+              : `${cp}:[],"strategic_recommendation":"See landscape summary for strategic guidance."}`;
+            try {
+              const parsed = JSON.parse(fixed + tail);
+              parsed.data_source = (parsed.data_source || dataSource) + ' (partial)';
+              res.write(`data: ${JSON.stringify({ type: 'complete', data: parsed })}\n\n`);
+              res.end();
+              return;
+            } catch(e) {}
           }
-          try {
-            const parsed = JSON.parse(fixed);
-            parsed.data_source = (parsed.data_source || dataSource) + ' (partial)';
-            res.write(`data: ${JSON.stringify({ type: 'complete', data: parsed })}\n\n`);
-          } catch(e2) {
-            res.write(`data: ${JSON.stringify({ type: 'error', message: 'Could not parse response', raw: cleaned.slice(0, 300) })}\n\n`);
-          }
-        } else {
-          res.write(`data: ${JSON.stringify({ type: 'error', message: 'JSON parse failed', raw: cleaned.slice(0, 300) })}\n\n`);
         }
       }
+
+      res.write(`data: ${JSON.stringify({ type: 'error', message: 'Could not parse AI response. Please try again.', raw: cleaned.slice(0, 200) })}\n\n`);
       res.end();
     });
 

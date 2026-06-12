@@ -1,11 +1,5 @@
 // api/epo-search.js
-// Serverless proxy: receives a search request from the frontend,
-// calls EPO OPS with a valid bearer token, normalises the response,
-// and returns structured patent data.
-
 const fetch = require('node-fetch');
-
-// ── Helpers ──────────────────────────────────────────────────────────────────
 
 function ensureArray(val) {
   if (!val) return [];
@@ -15,68 +9,82 @@ function ensureArray(val) {
 function extractText(obj) {
   if (!obj) return '';
   if (typeof obj === 'string') return obj;
-  if (obj.$) return obj.$;  // EPO text nodes often use $ for content
+  if (obj.$) return obj.$;
   if (obj['#text']) return obj['#text'];
   if (Array.isArray(obj)) return obj.map(extractText).join('; ');
   return '';
 }
 
-// Build EPO CQL query — keyword-only for reliability
-// CPC codes are too granular and often return zero; keywords against title+abstract
-// is more robust and still returns highly relevant results.
+// Build a well-targeted CQL query for EPO OPS
+// Strategy: take 2-3 highly specific terms from the query and AND them
+// with a CO2 anchor term to keep results focused but not empty
 function buildQuery(cpcCodes, keywords) {
-  const parts = [];
+  if (!keywords) return 'ta=CO2 AND ta=carbonate';
 
-  if (keywords) {
-    // Extract the most distinctive 4-6 words, clean for CQL
-    const kw = keywords
-      .replace(/[^\w\s]/g, ' ')
-      .split(/\s+/)
-      .filter(w => w.length > 3 && !['from','with','that','this','into','using','based','have','been','will','and','for','the'].includes(w.toLowerCase()))
-      .slice(0, 5);
-    if (kw.length > 0) {
-      // Use OR for broader coverage — EPO CQL is strict with AND
-      parts.push(`ta=(${kw.join(' OR ')})`);
+  // Stopwords to exclude
+  const stop = new Set([
+    'from','with','that','this','into','using','based','have','been','will',
+    'and','for','the','via','over','under','after','before','through',
+    'synthesis','synthetic','preparation','process','method','production',
+    'catalyst','catalytic','catalysis','reaction','reactions',
+    'study','studies','review','novel','new','improved','efficient'
+  ]);
+
+  // Extract meaningful technical terms
+  const words = keywords
+    .replace(/[^\w\s]/g, ' ')
+    .split(/\s+/)
+    .map(w => w.toLowerCase())
+    .filter(w => w.length > 3 && !stop.has(w));
+
+  // Always anchor on CO2 variants
+  const co2Terms = ['CO2', 'carbon dioxide', 'CO₂'];
+  const hasCO2 = words.some(w => ['co2','carbon','dioxide'].includes(w));
+
+  // Pick 2 most specific remaining terms
+  const techTerms = words
+    .filter(w => !['co2','carbon','dioxide','oxide','carbon'].includes(w))
+    .slice(0, 2);
+
+  const queryParts = [];
+
+  // CO2 anchor
+  queryParts.push('ta=CO2');
+
+  // Add up to 2 specific technical terms
+  techTerms.forEach(term => {
+    queryParts.push(`ta=${term}`);
+  });
+
+  // If CPC codes available, add one as extra filter
+  if (cpcCodes && cpcCodes.length > 0) {
+    const code = cpcCodes[0].split(' ')[0].replace(/[^A-Z0-9/]/gi, '');
+    if (code && code.length > 3) {
+      queryParts.push(`cpc=${code}`);
     }
   }
 
-  if (cpcCodes && cpcCodes.length > 0 && parts.length === 0) {
-    // Only fall back to CPC if no keywords
-    const codes = cpcCodes
-      .slice(0, 2)
-      .map(c => c.split(' ')[0].replace(/[^A-Z0-9/]/gi, ''))
-      .filter(Boolean);
-    if (codes.length > 0) {
-      const cpcPart = codes.map(c => `cpc=${c}`).join(' OR ');
-      parts.push(`(${cpcPart})`);
-    }
-  }
-
-  return parts.length > 0 ? parts.join(' AND ') : 'ta=CO2 utilisation';
+  return queryParts.join(' AND ');
 }
 
-// Normalise a single EPO patent result into a clean object
 function normalisePatent(doc) {
   try {
-    const biblio  = doc['exchange-document']?.['bibliographic-data'] || doc['bibliographic-data'] || {};
-    const titles  = ensureArray(biblio['invention-title']);
-    const title   = titles.map(t => extractText(t)).filter(Boolean)[0] || 'Untitled';
+    const biblio = doc['exchange-document']?.['bibliographic-data'] || doc['bibliographic-data'] || {};
+    const titles = ensureArray(biblio['invention-title']);
+    const title = titles.map(t => extractText(t)).filter(Boolean)[0] || 'Untitled';
 
-    // Applicants / assignees
     const appParties = biblio['parties']?.['applicants']?.['applicant'] || [];
-    const assignees  = ensureArray(appParties)
+    const assignees = ensureArray(appParties)
       .map(a => extractText(a?.['applicant-name']?.['name']))
       .filter(Boolean);
 
-    // Publication date and number
-    const pubRef    = biblio['publication-reference']?.['document-id'];
-    const pubDocs   = ensureArray(pubRef);
-    const epodoc    = pubDocs.find(d => d?.['@document-id-type'] === 'epodoc') || pubDocs[0] || {};
-    const pubDate   = extractText(epodoc['date']) || '';
+    const pubRef = biblio['publication-reference']?.['document-id'];
+    const pubDocs = ensureArray(pubRef);
+    const epodoc = pubDocs.find(d => d?.['@document-id-type'] === 'epodoc') || pubDocs[0] || {};
+    const pubDate = extractText(epodoc['date']) || '';
     const pubNumber = extractText(epodoc['doc-number']) || '';
-    const year      = pubDate ? parseInt(pubDate.slice(0, 4)) : null;
+    const year = pubDate ? parseInt(pubDate.slice(0, 4)) : null;
 
-    // CPC classifications
     const cpcSection = biblio['patent-classifications']?.['patent-classification'] || [];
     const cpcs = ensureArray(cpcSection)
       .map(c => [
@@ -90,104 +98,83 @@ function normalisePatent(doc) {
       .filter(c => c.length > 2)
       .slice(0, 3);
 
-    // Abstract
     const abstractSection = doc['exchange-document']?.['abstract'] || doc['abstract'];
-    const abstractParts   = ensureArray(abstractSection);
-    const abstract        = abstractParts
+    const abstractParts = ensureArray(abstractSection);
+    const abstract = abstractParts
       .map(a => extractText(a?.p || a))
       .filter(Boolean)
       .join(' ')
       .slice(0, 400);
 
     return {
-      title:     title.slice(0, 150),
-      assignee:  assignees[0] || 'Unknown',
+      title: title.slice(0, 150),
+      assignee: assignees[0] || 'Unknown',
       year,
-      number:    pubNumber,
+      number: pubNumber,
       cpc_codes: cpcs,
-      abstract:  abstract || 'Abstract not available.',
-      status:    year && year < 2004 ? 'expired' : 'active'  // simplified heuristic
+      abstract: abstract || '',
+      status: year && year < 2004 ? 'expired' : 'active'
     };
   } catch {
     return null;
   }
 }
 
-// ── Main handler ──────────────────────────────────────────────────────────────
-
 module.exports = async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
   if (req.method === 'OPTIONS') return res.status(200).end();
-  if (req.method !== 'POST')   return res.status(405).json({ error: 'Method not allowed' });
+  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
   const { cpc_codes, keywords, range = '1-25' } = req.body || {};
 
-  if (!cpc_codes?.length && !keywords) {
-    return res.status(400).json({ error: 'Provide at least cpc_codes or keywords.' });
-  }
-
-  // 1. Get a fresh EPO bearer token
-  const consumerKey    = process.env.EPO_CONSUMER_KEY;
+  const consumerKey = process.env.EPO_CONSUMER_KEY;
   const consumerSecret = process.env.EPO_CONSUMER_SECRET;
-
   if (!consumerKey || !consumerSecret) {
-    return res.status(500).json({ error: 'EPO credentials not configured on server.' });
+    return res.status(500).json({ error: 'EPO credentials not configured.' });
   }
 
+  // Auth
   let accessToken;
   try {
     const credentials = Buffer.from(`${consumerKey}:${consumerSecret}`).toString('base64');
     const tokenRes = await fetch('https://ops.epo.org/3.2/auth/accesstoken', {
-      method:  'POST',
+      method: 'POST',
       headers: { 'Authorization': `Basic ${credentials}`, 'Content-Type': 'application/x-www-form-urlencoded' },
-      body:    'grant_type=client_credentials'
+      body: 'grant_type=client_credentials'
     });
     if (!tokenRes.ok) throw new Error(`Auth failed: ${tokenRes.status}`);
     const td = await tokenRes.json();
     accessToken = td.access_token;
   } catch (err) {
-    return res.status(502).json({ error: 'EPO authentication failed', detail: err.message });
+    return res.status(502).json({ error: 'EPO auth failed', detail: err.message });
   }
 
-  // 2. Build and execute the CQL search
+  // Search
   const query = buildQuery(cpc_codes, keywords);
-
   let searchData;
   try {
-    const searchUrl = `https://ops.epo.org/3.2/rest-services/published-data/search/biblio?q=${encodeURIComponent(query)}&Range=${range}`;
-    const searchRes = await fetch(searchUrl, {
-      headers: {
-        'Authorization': `Bearer ${accessToken}`,
-        'Accept': 'application/json'
-      }
+    const url = `https://ops.epo.org/3.2/rest-services/published-data/search/biblio?q=${encodeURIComponent(query)}&Range=${range}`;
+    const searchRes = await fetch(url, {
+      headers: { 'Authorization': `Bearer ${accessToken}`, 'Accept': 'application/json' }
     });
-
     if (!searchRes.ok) {
       const errText = await searchRes.text();
-      return res.status(searchRes.status).json({
-        error: `EPO search failed: ${searchRes.status}`,
-        query,
-        detail: errText.slice(0, 500)
-      });
+      return res.status(200).json({ error: `EPO search failed: ${searchRes.status}`, query, detail: errText.slice(0, 300), total_results: 0, patents: [] });
     }
-
     searchData = await searchRes.json();
   } catch (err) {
-    return res.status(502).json({ error: 'EPO search request failed', detail: err.message });
+    return res.status(200).json({ error: 'EPO request failed', detail: err.message, total_results: 0, patents: [] });
   }
 
-  // 3. Parse results
+  // Parse
   try {
-    const results     = searchData?.['ops:world-patent-data']?.['ops:biblio-search']?.['ops:search-result'];
-    const totalCount  = parseInt(
-      searchData?.['ops:world-patent-data']?.['ops:biblio-search']?.['@total-result-count'] || '0'
-    );
-    const docList     = ensureArray(results?.['exchange-documents']?.['exchange-document'] || results?.['exchange-document']);
-    const patents     = docList.map(normalisePatent).filter(Boolean);
+    const results = searchData?.['ops:world-patent-data']?.['ops:biblio-search']?.['ops:search-result'];
+    const totalCount = parseInt(searchData?.['ops:world-patent-data']?.['ops:biblio-search']?.['@total-result-count'] || '0');
+    const docList = ensureArray(results?.['exchange-documents']?.['exchange-document'] || results?.['exchange-document']);
+    const patents = docList.map(normalisePatent).filter(Boolean);
 
-    // Derive assignee frequency
     const assigneeMap = {};
     patents.forEach(p => {
       if (p.assignee && p.assignee !== 'Unknown') {
@@ -199,20 +186,18 @@ module.exports = async function handler(req, res) {
       .slice(0, 8)
       .map(([name, count]) => ({ name, count }));
 
-    // Year distribution for trend
     const yearDist = {};
     patents.forEach(p => { if (p.year) yearDist[p.year] = (yearDist[p.year] || 0) + 1; });
 
     return res.status(200).json({
       total_results: totalCount,
-      query_used:    query,
+      query_used: query,
       patents,
       top_assignees: topAssignees,
       year_distribution: yearDist,
       retrieved: patents.length
     });
-
   } catch (err) {
-    return res.status(500).json({ error: 'Failed to parse EPO response', detail: err.message });
+    return res.status(200).json({ error: 'Parse failed', detail: err.message, total_results: 0, patents: [] });
   }
 };
