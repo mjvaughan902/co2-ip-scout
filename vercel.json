@@ -1,0 +1,13 @@
+{
+  "functions": {
+    "api/ai-stream.js": {
+      "maxDuration": 60
+    },
+    "api/epo-search.js": {
+      "maxDuration": 30
+    },
+    "api/ai-analyse.js": {
+      "maxDuration": 60
+    }
+  }
+}

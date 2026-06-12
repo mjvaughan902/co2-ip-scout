@@ -1,0 +1,13 @@
+{
+  "name": "co2-ip-scout",
+  "version": "1.0.0",
+  "description": "CO2 Utilisation IP Scout - Patent landscape intelligence platform",
+  "private": true,
+  "scripts": {
+    "dev": "vercel dev",
+    "deploy": "vercel --prod"
+  },
+  "dependencies": {
+    "node-fetch": "^2.7.0"
+  }
+}

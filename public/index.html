@@ -1,0 +1,751 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CO₂ Utilisation IP Scout</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f7f7f5; color: #1a1a1a; min-height: 100vh; }
+.app { max-width: 980px; margin: 0 auto; padding: 0 24px 60px; }
+
+/* Top bar */
+.top-bar { display: flex; align-items: center; justify-content: space-between; padding: 1.25rem 0 0.9rem; border-bottom: 1px solid #e4e2dc; margin-bottom: 0; }
+.brand { display: flex; align-items: center; gap: 10px; }
+.logo-pill { background: #1D9E75; color: #fff; font-size: 10px; font-weight: 700; padding: 3px 9px; border-radius: 4px; letter-spacing: 0.07em; }
+.brand-name { font-size: 18px; font-weight: 700; color: #111; }
+.brand-sub { font-size: 12px; color: #aaa; }
+.top-actions { display: flex; gap: 7px; align-items: center; }
+.data-badge { font-size: 11px; padding: 3px 9px; border-radius: 20px; font-weight: 500; }
+.db-live { background: #eaf8f2; color: #0F6E56; border: 1px solid #b5e8d5; }
+.db-ai   { background: #fdf1dc; color: #854F0B; border: 1px solid #f0d49a; }
+
+/* Nav */
+.main-nav { display: flex; border-bottom: 1px solid #e4e2dc; margin-bottom: 1.5rem; }
+.nav-tab { padding: 9px 16px; font-size: 13px; cursor: pointer; color: #888; background: none; border: none; border-bottom: 2px solid transparent; font-family: inherit; margin-bottom: -1px; display: flex; align-items: center; gap: 6px; }
+.nav-tab.active { color: #1D9E75; border-bottom-color: #1D9E75; font-weight: 600; }
+.nav-tab:hover:not(.active) { color: #444; }
+.nav-badge { font-size: 10px; background: #e8e6e0; border-radius: 10px; padding: 1px 6px; color: #666; }
+.nav-tab.active .nav-badge { background: #c5edd8; color: #0F6E56; }
+
+/* Panels */
+.panel { display: none; }
+.panel.active { display: block; }
+
+/* Buttons */
+.btn-p { padding: 9px 16px; background: #1D9E75; color: #fff; border: none; border-radius: 7px; font-size: 13px; font-weight: 600; cursor: pointer; font-family: inherit; white-space: nowrap; display: inline-flex; align-items: center; gap: 6px; transition: background 0.15s; }
+.btn-p:hover { background: #0F6E56; }
+.btn-p:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn-s { padding: 7px 12px; font-size: 12px; border: 1px solid #d0cec8; border-radius: 7px; cursor: pointer; color: #666; background: #fff; font-family: inherit; display: inline-flex; align-items: center; gap: 5px; }
+.btn-s:hover { background: #f0eeea; }
+
+/* Family grid */
+.slbl { font-size: 10px; font-weight: 700; letter-spacing: 0.1em; color: #aaa; text-transform: uppercase; margin-bottom: 9px; }
+.fgrid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 7px; margin-bottom: 1.2rem; }
+.fc { background: #fff; border: 1px solid #e4e2dc; border-radius: 8px; padding: 9px 11px; cursor: pointer; transition: border-color 0.12s; }
+.fc:hover { border-color: #bbb; }
+.fc.sel { border-color: #1D9E75; background: #eaf8f2; }
+.fc.ca  { border-color: #378ADD; background: #eaf2fb; }
+.fc.cb  { border-color: #BA7517; background: #fdf1dc; }
+.fc-ic { font-size: 16px; margin-bottom: 4px; }
+.fc-nm { font-size: 11px; font-weight: 600; color: #222; line-height: 1.35; margin-bottom: 2px; }
+.fc.sel .fc-nm { color: #0F6E56; }
+.fc.ca  .fc-nm { color: #185FA5; }
+.fc.cb  .fc-nm { color: #854F0B; }
+.fc-sb { font-size: 10px; color: #aaa; line-height: 1.4; }
+
+/* Search */
+.srow { display: flex; gap: 8px; margin-bottom: 8px; }
+.sinput { flex: 1; padding: 9px 13px; font-size: 14px; border: 1px solid #d0cec8; border-radius: 7px; background: #fff; color: #111; font-family: inherit; }
+.sinput:focus { outline: none; border-color: #1D9E75; box-shadow: 0 0 0 3px rgba(29,158,117,0.1); }
+.trow { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin-bottom: 1.1rem; }
+.tlbl { font-size: 11px; color: #bbb; }
+.tag { padding: 3px 9px; font-size: 11px; border: 1px solid #e0deda; border-radius: 20px; cursor: pointer; color: #888; background: #fff; }
+.tag:hover { border-color: #1D9E75; color: #0F6E56; }
+
+/* Result tabs */
+.rtabs { display: flex; border: 1px solid #e4e2dc; border-radius: 8px; overflow: hidden; margin-bottom: 1.1rem; background: #fff; }
+.rtab { flex: 1; padding: 7px 8px; font-size: 12px; text-align: center; cursor: pointer; color: #888; background: #fff; border: none; border-right: 1px solid #e4e2dc; font-family: inherit; }
+.rtab:last-child { border-right: none; }
+.rtab.active { background: #f0eeea; color: #222; font-weight: 600; }
+.rtab:hover:not(.active) { background: #f7f7f5; }
+
+/* Results */
+.results { min-height: 200px; }
+.empty { text-align: center; padding: 3rem 1rem; color: #bbb; }
+.empty-ic { font-size: 32px; margin-bottom: 12px; opacity: 0.5; }
+.empty p { font-size: 13px; line-height: 1.7; }
+.loading { padding: 1.5rem 0; }
+.lrow { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+.spin { width: 14px; height: 14px; border: 2px solid #e0deda; border-top-color: #1D9E75; border-radius: 50%; animation: spin 0.75s linear infinite; flex-shrink: 0; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.ltxt { font-size: 13px; color: #aaa; }
+
+/* Content */
+.shdr { font-size: 10px; font-weight: 700; letter-spacing: 0.09em; color: #aaa; text-transform: uppercase; margin-bottom: 9px; padding-bottom: 6px; border-bottom: 1px solid #eeece6; display: flex; align-items: center; justify-content: space-between; }
+.rblock { margin-bottom: 1.3rem; }
+.mets { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 1rem; }
+.met { background: #f0eeea; border-radius: 8px; padding: 10px 13px; }
+.met-lbl { font-size: 10px; color: #aaa; margin-bottom: 3px; }
+.met-val { font-size: 21px; font-weight: 700; color: #111; line-height: 1.1; }
+.met-sub { font-size: 10px; color: #bbb; margin-top: 1px; }
+.card { background: #fff; border: 1px solid #e4e2dc; border-radius: 10px; padding: 1.1rem 1.2rem; margin-bottom: 1rem; }
+.prose { font-size: 13px; line-height: 1.85; color: #333; }
+.prose p { margin-bottom: 8px; }
+.cpc-chips { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 10px; }
+.chip { font-size: 10px; font-family: 'SF Mono','Fira Code',monospace; padding: 2px 7px; background: #f0eeea; border: 1px solid #e0deda; border-radius: 4px; color: #888; }
+.chart-wrap { position: relative; width: 100%; height: 170px; margin-bottom: 1rem; }
+.strat { padding: 12px 14px; background: #f7f7f5; border-radius: 8px; margin-bottom: 1rem; border-left: 3px solid #1D9E75; }
+.strat-lbl { font-size: 10px; font-weight: 700; color: #aaa; text-transform: uppercase; letter-spacing: 0.07em; margin-bottom: 5px; }
+.strat-txt { font-size: 13px; line-height: 1.75; color: #333; }
+.erow { display: flex; gap: 7px; margin-top: 1rem; padding-top: 1rem; border-top: 1px solid #f0eeea; flex-wrap: wrap; }
+.ws-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 1rem; }
+.ws { background: #fff; border: 1px solid #e4e2dc; border-radius: 8px; padding: 10px 12px; }
+.ws.opp  { border-left: 3px solid #1D9E75; border-radius: 0 8px 8px 0; }
+.ws.risk { border-left: 3px solid #D85A30; border-radius: 0 8px 8px 0; }
+.ws-ttl { font-size: 12px; font-weight: 600; color: #222; margin-bottom: 4px; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.ws-body { font-size: 11px; color: #888; line-height: 1.65; }
+.sbg { font-size: 10px; padding: 1px 6px; border-radius: 20px; }
+.sh { background: #eaf8f2; color: #0F6E56; }
+.sm { background: #fdf1dc; color: #854F0B; }
+.sl { background: #f0eeea; color: #888; }
+.arow { display: flex; align-items: center; gap: 10px; padding: 7px 0; border-bottom: 1px solid #f5f4f0; }
+.arn { font-size: 11px; color: #ccc; width: 18px; flex-shrink: 0; }
+.ain { flex: 1; min-width: 0; }
+.anm { font-size: 12px; color: #222; font-weight: 500; }
+.afoc { font-size: 10px; color: #bbb; }
+.abw { width: 90px; height: 3px; background: #f0eeea; border-radius: 2px; flex-shrink: 0; }
+.ab  { height: 3px; background: #1D9E75; border-radius: 2px; }
+.acnt { font-size: 11px; color: #bbb; width: 30px; text-align: right; flex-shrink: 0; }
+.pat { background: #fff; border: 1px solid #e4e2dc; border-radius: 8px; padding: 10px 14px; margin-bottom: 7px; }
+.pt { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; margin-bottom: 4px; }
+.pttl { font-size: 12px; font-weight: 600; color: #222; flex: 1; line-height: 1.5; }
+.pbdg { font-size: 10px; padding: 2px 7px; border-radius: 20px; white-space: nowrap; flex-shrink: 0; }
+.ba { background: #eaf8f2; color: #0F6E56; }
+.be { background: #f0eeea; color: #888; }
+.bf { background: #fdf1dc; color: #854F0B; }
+.pmt { font-size: 10px; color: #bbb; display: flex; gap: 10px; flex-wrap: wrap; }
+.pab { font-size: 11px; color: #999; margin-top: 4px; line-height: 1.65; }
+
+/* EPO live results panel */
+.epo-panel { background: #fff; border: 1px solid #e4e2dc; border-radius: 10px; overflow: hidden; margin-bottom: 1rem; }
+.epo-header { background: #f0f8f5; padding: 10px 14px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #e4e2dc; }
+.epo-title { font-size: 12px; font-weight: 600; color: #0F6E56; display: flex; align-items: center; gap: 7px; }
+.epo-count { font-size: 11px; color: #888; }
+.epo-list { padding: 8px 14px; max-height: 280px; overflow-y: auto; }
+.epo-item { padding: 8px 0; border-bottom: 1px solid #f5f4f0; }
+.epo-item:last-child { border-bottom: none; }
+.epo-itm-ttl { font-size: 12px; font-weight: 500; color: #222; margin-bottom: 3px; }
+.epo-itm-meta { font-size: 10px; color: #bbb; display: flex; gap: 10px; }
+
+/* Compare */
+.cmp-slots { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 0.9rem; }
+.cmp-slot { background: #f7f7f5; border-radius: 8px; padding: 10px 13px; min-height: 52px; }
+.cs-lbl { font-size: 10px; font-weight: 700; letter-spacing: 0.07em; text-transform: uppercase; margin-bottom: 4px; }
+.csa .cs-lbl { color: #185FA5; }
+.csb .cs-lbl { color: #854F0B; }
+.cs-val { font-size: 13px; color: #222; font-weight: 500; }
+.cs-empty { font-size: 12px; color: #bbb; font-style: italic; }
+.vsdiv { text-align: center; font-size: 10px; color: #ccc; padding: 7px 0; border-top: 1px solid #eeece6; border-bottom: 1px solid #eeece6; margin: 12px 0; font-weight: 700; letter-spacing: 0.1em; }
+.cmp-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 1rem; }
+.cmph { font-size: 12px; font-weight: 600; padding: 7px 10px; border-radius: 7px; text-align: center; margin-bottom: 8px; }
+.cha { background: #eaf2fb; color: #185FA5; }
+.chb { background: #fdf1dc; color: #854F0B; }
+.met2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 8px; }
+
+/* Projects */
+.pj-card { background: #fff; border: 1px solid #e4e2dc; border-radius: 8px; padding: 10px 14px; display: flex; align-items: center; gap: 10px; cursor: pointer; margin-bottom: 7px; }
+.pj-card:hover { border-color: #bbb; }
+.pj-info { flex: 1; min-width: 0; }
+.pj-name { font-size: 13px; font-weight: 600; color: #222; }
+.pj-meta { font-size: 11px; color: #bbb; margin-top: 2px; display: flex; align-items: center; gap: 7px; }
+.fb { font-size: 10px; padding: 2px 7px; background: #eaf8f2; border-radius: 20px; color: #0F6E56; }
+.pj-acts { display: flex; gap: 5px; }
+.ibtn { padding: 5px 7px; font-size: 13px; border: 1px solid #e4e2dc; border-radius: 6px; cursor: pointer; color: #bbb; background: #fff; font-family: inherit; }
+.ibtn:hover { background: #f0eeea; color: #666; }
+.ibtn.del:hover { color: #D85A30; border-color: #D85A30; }
+.save-bar { display: flex; gap: 8px; align-items: center; padding: 10px 13px; background: #f0eeea; border-radius: 8px; margin-bottom: 1rem; }
+.save-in { flex: 1; padding: 7px 10px; font-size: 13px; border: 1px solid #d0cec8; border-radius: 6px; background: #fff; color: #111; font-family: inherit; }
+.save-in:focus { outline: none; border-color: #1D9E75; }
+.err { background: #fef0ee; border: 1px solid #f5c9c0; border-radius: 8px; padding: 11px 14px; color: #993C1D; font-size: 13px; }
+.pj-empty { text-align: center; padding: 2.5rem; color: #bbb; font-size: 13px; }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <div class="top-bar">
+    <div class="brand">
+      <span class="logo-pill">IP SCOUT</span>
+      <span class="brand-name">CO₂ Utilisation IP Scout</span>
+      <span class="brand-sub">— patent landscape intelligence</span>
+    </div>
+    <div class="top-actions">
+      <span class="data-badge db-ai" id="dataBadge">AI estimates</span>
+      <button class="btn-s" id="pdfBtn" onclick="exportPDF()" style="display:none">⬇ Export PDF</button>
+      <button class="btn-s" id="saveBtn" onclick="showSaveBar()" style="display:none">🔖 Save</button>
+    </div>
+  </div>
+
+  <nav class="main-nav">
+    <button class="nav-tab active" id="nav-analyse"  onclick="switchNav('analyse')">🔬 Analyse</button>
+    <button class="nav-tab"        id="nav-compare"  onclick="switchNav('compare')">⚖ Compare</button>
+    <button class="nav-tab"        id="nav-projects" onclick="switchNav('projects')">📁 Projects <span class="nav-badge" id="projBadge"></span></button>
+  </nav>
+
+  <!-- ANALYSE -->
+  <div class="panel active" id="panel-analyse">
+    <div class="slbl">Chemistry family</div>
+    <div class="fgrid" id="famGrid"></div>
+    <div class="srow">
+      <input class="sinput" id="qIn" type="text" placeholder="Select a chemistry family above, or describe your technology directly…" />
+      <button class="btn-p" id="searchBtn" onclick="runSearch()">🔍 Analyse</button>
+    </div>
+    <div class="trow" id="tagRow">
+      <span class="tlbl">Quick starts:</span>
+      <span class="tag" onclick="setQ('Propylene carbonate synthesis from CO₂ and propylene oxide organocatalyst')">PC synthesis</span>
+      <span class="tag" onclick="setQ('Copper catalyst CO₂ electroreduction selectivity ethylene')">CO₂ to ethylene</span>
+      <span class="tag" onclick="setQ('Reactive MgO cement CO₂ curing accelerated carbonation')">MgO carbonation</span>
+      <span class="tag" onclick="setQ('CO₂ polycarbonate polyol zinc double metal cyanide catalyst')">CO₂ polyols</span>
+    </div>
+    <div id="saveBar" style="display:none;" class="save-bar">
+      <input class="save-in" id="projNameIn" placeholder="Project name…" />
+      <button class="btn-p" onclick="confirmSave()">Save</button>
+      <button class="btn-s" onclick="document.getElementById('saveBar').style.display='none'">Cancel</button>
+    </div>
+    <div class="rtabs">
+      <button class="rtab active" id="rt-landscape"  onclick="setRT('landscape')">🗺 Landscape</button>
+      <button class="rtab"        id="rt-epo"        onclick="setRT('epo')">📡 Live EPO data</button>
+      <button class="rtab"        id="rt-whitespace" onclick="setRT('whitespace')">👁 White space</button>
+      <button class="rtab"        id="rt-assignees"  onclick="setRT('assignees')">🏢 Assignees</button>
+      <button class="rtab"        id="rt-patents"    onclick="setRT('patents')">📄 Patents</button>
+    </div>
+    <div class="results" id="resultsArea">
+      <div class="empty"><div class="empty-ic">⚗</div><p>Select a chemistry family and enter a query<br>to generate your patent landscape analysis.</p></div>
+    </div>
+  </div>
+
+  <!-- COMPARE -->
+  <div class="panel" id="panel-compare">
+    <p style="font-size:13px;color:#888;margin-bottom:1rem;line-height:1.6;">Compare two chemistry families head-to-head. Click once for Route A (blue), once more for Route B (amber).</p>
+    <div class="slbl">Select Route A (blue) and Route B (amber)</div>
+    <div class="fgrid" id="cmpGrid"></div>
+    <div class="cmp-slots">
+      <div class="cmp-slot csa"><div class="cs-lbl">Route A</div><div id="slotA"><span class="cs-empty">No family selected</span></div></div>
+      <div class="cmp-slot csb"><div class="cs-lbl">Route B</div><div id="slotB"><span class="cs-empty">No family selected</span></div></div>
+    </div>
+    <div class="srow" style="margin-bottom:0.75rem;">
+      <input class="sinput" id="cmpQ" placeholder="Optional: narrow the comparison to a specific aspect…" />
+      <button class="btn-p" id="cmpBtn" onclick="runComparison()">⚖ Compare</button>
+    </div>
+    <div class="results" id="cmpResults">
+      <div class="empty"><div class="empty-ic">⚖</div><p>Select two chemistry families above<br>to begin a head-to-head comparison.</p></div>
+    </div>
+  </div>
+
+  <!-- PROJECTS -->
+  <div class="panel" id="panel-projects">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;">
+      <div>
+        <div style="font-size:16px;font-weight:700;color:#111;margin-bottom:3px;">Saved projects</div>
+        <div style="font-size:12px;color:#bbb;">Patent landscape searches, saved for reference and reporting.</div>
+      </div>
+    </div>
+    <div id="projList"></div>
+    <div id="projDetail" style="display:none;"></div>
+  </div>
+
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script>
+// ── Config ───────────────────────────────────────────────────────────────────
+// In production these calls go to /api/* (same-origin Vercel functions).
+// For local dev with `vercel dev` this also works out of the box.
+const API = { search: '/api/epo-search', analyse: '/api/ai-analyse', stream: '/api/ai-stream' };
+
+// ── Chemistry families ────────────────────────────────────────────────────────
+const FAMILIES = [
+  { id:'carbonates',     ic:'🔵', nm:'Cyclic & linear carbonates',  sb:'PC, DMC, ethylene carbonate',    cpc:['C07D317','B01J31','C07C68'],     sugg:['Propylene carbonate synthesis CO₂ organocatalyst bifunctional','Dimethyl carbonate CO₂ transesterification','Metal-organic framework CO₂ cycloaddition epoxide','Zinc salen complex CO₂ cycloaddition'] },
+  { id:'carboxylation',  ic:'⇌',  nm:'Carboxylation reactions',     sb:'Acrylates, formates, oxalates',  cpc:['C07C51','C07C53','B01J23'],      sugg:['CO₂ carboxylation alkenes acrylate nickel catalyst','Electroreductive carboxylation organic substrates CO₂','Formic acid CO₂ hydrogenation homogeneous catalyst','Nickel palladium CO₂ insertion reactions'] },
+  { id:'fuels',          ic:'🔥', nm:'CO₂ to fuels',                sb:'Methanol, Fischer-Tropsch',      cpc:['C07C1','C10G2','B01J23'],        sugg:['CO₂ hydrogenation methanol copper zinc oxide catalyst','Reverse water-gas shift reaction catalyst design','Fischer-Tropsch CO₂ syngas sustainable aviation','Power-to-liquid e-fuel CO₂ electrolysis'] },
+  { id:'mineralisation', ic:'🪨', nm:'Mineralisation',              sb:'CaCO₃, MgCO₃, concrete',        cpc:['C04B28','C01F11','C01F5'],        sugg:['Reactive magnesium oxide cement CO₂ curing','Accelerated calcium silicate carbonation CO₂','Mineral trapping CO₂ basaltic rock geological','CO₂ curing precast concrete accelerated'] },
+  { id:'polymers',       ic:'🔗', nm:'Polymer synthesis',           sb:'Polycarbonates, polyols',        cpc:['C08G64','C08G71','C08G18'],      sugg:['CO₂ polycarbonate polyol zinc catalyst copolymerisation','CO₂ epoxide double metal cyanide DMC catalyst','Polypropylene carbonate thermoplastic CO₂','Polyurethane precursor CO₂ based polyol'] },
+  { id:'c1feedstock',    ic:'🌿', nm:'C1 feedstock routes',         sb:'Dry reforming, syngas',          cpc:['C01B3','B01J23','C07C1'],        sugg:['Dry reforming methane CO₂ nickel catalyst coking resistant','CO₂ C1 building block carboxylation organic synthesis','Bi-reforming syngas CO₂ methane','CO₂ methanation Sabatier nickel ruthenium'] },
+  { id:'electrochemical',ic:'⚡', nm:'Electrochemical reduction',   sb:'CO, ethylene, formic acid',      cpc:['C25B3','C25B11','H01M4'],        sugg:['Copper catalyst CO₂ electroreduction ethylene selectivity faradaic','Gas diffusion electrode CO₂RR flow cell design','CO₂ formic acid electrochemical reduction selectivity','Molecular catalyst selective CO₂ electroreduction turnover'] },
+  { id:'photocatalytic', ic:'☀',  nm:'Photocatalytic conversion',   sb:'Solar fuels, photoredox',        cpc:['B01J35','C01B32','H01G9'],       sugg:['TiO₂ photocatalyst CO₂ reduction methanol selectivity','Perovskite photocatalytic CO₂ conversion solar','Z-scheme heterojunction artificial photosynthesis CO₂','Molecular photosensitiser rhenium ruthenium CO₂ reduction'] }
+];
+
+let activeFamily=null, cmpA=null, cmpB=null;
+let currentRT='landscape', lastData=null, lastEPO=null;
+let projects=[];
+
+// ── Storage ───────────────────────────────────────────────────────────────────
+// localStorage used here (this is a hosted app, not a Claude artifact)
+function loadProjects() {
+  try { projects = JSON.parse(localStorage.getItem('ip-scout-projects')||'[]'); } catch { projects=[]; }
+}
+function saveProjectsLocal() {
+  try { localStorage.setItem('ip-scout-projects', JSON.stringify(projects)); } catch {}
+}
+
+// ── Nav ───────────────────────────────────────────────────────────────────────
+function switchNav(tab) {
+  ['analyse','compare','projects'].forEach(t => {
+    document.getElementById('panel-'+t).classList.toggle('active', t===tab);
+    document.getElementById('nav-'+t).classList.toggle('active', t===tab);
+  });
+  if (tab==='projects') renderProjects();
+}
+
+// ── Family grids ──────────────────────────────────────────────────────────────
+function buildGrids() {
+  const mk = (pfx, fn) => FAMILIES.map(f=>`
+    <div class="fc" id="${pfx}${f.id}" onclick="${fn}('${f.id}')">
+      <div class="fc-ic">${f.ic}</div>
+      <div class="fc-nm">${f.nm}</div>
+      <div class="fc-sb">${f.sb}</div>
+    </div>`).join('');
+  document.getElementById('famGrid').innerHTML = mk('fc-','selFam');
+  document.getElementById('cmpGrid').innerHTML = mk('cfc-','selCmp');
+}
+function selFam(id) {
+  activeFamily = FAMILIES.find(f=>f.id===id);
+  document.querySelectorAll('#famGrid .fc').forEach(c=>c.classList.remove('sel'));
+  document.getElementById('fc-'+id).classList.add('sel');
+  buildTags(activeFamily.sugg);
+  document.getElementById('qIn').placeholder = `e.g. ${activeFamily.sugg[0]}`;
+}
+function selCmp(id) {
+  const f=FAMILIES.find(x=>x.id===id);
+  if (!cmpA||(cmpA&&cmpB)){cmpA=f;cmpB=null;}
+  else if(cmpA.id===id){cmpA=null;}
+  else{cmpB=f;}
+  document.querySelectorAll('#cmpGrid .fc').forEach(c=>c.classList.remove('ca','cb'));
+  if(cmpA) document.getElementById('cfc-'+cmpA.id).classList.add('ca');
+  if(cmpB) document.getElementById('cfc-'+cmpB.id).classList.add('cb');
+  document.getElementById('slotA').innerHTML=cmpA?`<span class="cs-val">${cmpA.nm}</span>`:`<span class="cs-empty">No family selected</span>`;
+  document.getElementById('slotB').innerHTML=cmpB?`<span class="cs-val">${cmpB.nm}</span>`:`<span class="cs-empty">No family selected</span>`;
+}
+function buildTags(sugg){
+  document.getElementById('tagRow').innerHTML=`<span class="tlbl">Suggestions:</span>`+sugg.map(s=>`<span class="tag" onclick="setQ('${s.replace(/'/g,"\\'")}')">  ${s.length>46?s.slice(0,44)+'…':s}</span>`).join('');
+}
+function setQ(q){document.getElementById('qIn').value=q;}
+function setRT(tab){
+  currentRT=tab;
+  document.querySelectorAll('.rtab').forEach(t=>t.classList.remove('active'));
+  document.getElementById('rt-'+tab).classList.add('active');
+  if(lastData) renderRT(lastData, tab);
+}
+
+// ── Core search ───────────────────────────────────────────────────────────────
+async function runSearch() {
+  const query=document.getElementById('qIn').value.trim();
+  if(!query) return;
+  const btn=document.getElementById('searchBtn');
+  btn.disabled=true; btn.innerHTML='<span class="spin" style="display:inline-block;margin-right:6px;"></span>Analysing…';
+  document.getElementById('pdfBtn').style.display='none';
+  document.getElementById('saveBtn').style.display='none';
+  document.getElementById('saveBar').style.display='none';
+
+  const cpcCodes = activeFamily?.cpc || [];
+  let epoData = null;
+
+  // Step 1: EPO search — fast, updates badge immediately
+  showLoading('resultsArea');
+  updateLoadingStep('Querying EPO patent database…');
+  try {
+    const epoRes = await fetch(API.search, {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ cpc_codes: cpcCodes, keywords: query, range:'1-25' })
+    });
+    if (epoRes.ok) {
+      epoData = await epoRes.json();
+      lastEPO = epoData;
+      const epoTotal = epoData.total_results ? parseInt(epoData.total_results) : 0;
+      if (epoTotal > 0) {
+        const badge = document.getElementById('dataBadge');
+        badge.className='data-badge db-live';
+        badge.textContent=`Live EPO · ${epoTotal.toLocaleString()} patents found`;
+      }
+    }
+  } catch(e) { console.warn('EPO search failed:', e.message); }
+
+  // Step 2: Streaming AI analysis grounded in real EPO data
+  document.getElementById('resultsArea').innerHTML = `
+    <div style="padding:1rem 0;">
+      <div class="lrow"><div class="spin"></div><span class="ltxt">AI analysing ${epoData?.total_results||0} EPO patents — streaming response…</span></div>
+      <div id="streamBox" style="margin-top:1rem;padding:12px 14px;background:#f7f7f5;border-radius:8px;font-size:11px;font-family:monospace;color:#888;line-height:1.6;min-height:60px;max-height:180px;overflow-y:auto;white-space:pre-wrap;"></div>
+    </div>`;
+
+  try {
+    const streamRes = await fetch(API.stream, {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({
+        query,
+        family_id: activeFamily?.id || null,
+        real_patent_data: epoData ? {
+          total_results:    epoData.total_results,
+          top_assignees:    epoData.top_assignees,
+          year_distribution:epoData.year_distribution,
+          sample_patents:   epoData.patents?.slice(0,10)
+        } : null
+      })
+    });
+
+    if (!streamRes.ok) throw new Error(`Stream error ${streamRes.status}`);
+
+    const reader = streamRes.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop();
+
+      for (const line of lines) {
+        if (!line.startsWith('data:')) continue;
+        try {
+          const event = JSON.parse(line.slice(5).trim());
+          if (event.type === 'delta') {
+            const box = document.getElementById('streamBox');
+            if (box) { box.textContent += event.text; box.scrollTop = box.scrollHeight; }
+          } else if (event.type === 'complete') {
+            const d = event.data;
+            d._query = query;
+            d._family = activeFamily?.nm || d.chemistry_family;
+            d._epo = epoData || null;
+            // Merge real EPO patents into representative_patents if AI ones are placeholders
+            if (epoData && epoData.patents && epoData.patents.length > 0) {
+              d._epo_patents = epoData.patents.slice(0, 10);
+            }
+            lastData = d;
+            lastEPO = epoData;
+            const badge = document.getElementById('dataBadge');
+            if (epoData && epoData.total_results > 0) {
+              badge.className='data-badge db-live';
+              badge.textContent=`Live EPO · ${parseInt(epoData.total_results).toLocaleString()} patents · AI grounded`;
+            } else {
+              badge.className='data-badge db-ai';
+              badge.textContent='AI estimates';
+            }
+            renderRT(d, currentRT);
+            document.getElementById('pdfBtn').style.display='inline-flex';
+            document.getElementById('saveBtn').style.display='inline-flex';
+          } else if (event.type === 'error') {
+            throw new Error(event.message || 'Stream error');
+          }
+        } catch(parseErr) { /* skip malformed SSE */ }
+      }
+    }
+  } catch(e) {
+    document.getElementById('resultsArea').innerHTML=`<div class="err">Analysis failed: ${e.message}</div>`;
+  }
+
+  btn.disabled=false; btn.innerHTML='🔍 Analyse';
+}
+
+function showLoading(id) {
+  document.getElementById(id).innerHTML=`<div class="loading">
+    <div class="lrow"><div class="spin"></div><span class="ltxt" id="lstep">Connecting to EPO patent database…</span></div>
+    <div class="lrow"><div class="spin"></div><span class="ltxt">Running CPC classification query…</span></div>
+    <div class="lrow"><div class="spin"></div><span class="ltxt">Generating landscape analysis…</span></div>
+    <div class="lrow"><div class="spin"></div><span class="ltxt">Identifying white space and blocking risks…</span></div>
+  </div>`;
+}
+function updateLoadingStep(msg) {
+  const el=document.getElementById('lstep');
+  if(el) el.textContent=msg;
+}
+
+function tc(t){return t==='rising'?'#1D9E75':t==='declining'?'#D85A30':'#888';}
+
+function renderRT(d, tab) {
+  const el=document.getElementById('resultsArea');
+  if(tab==='landscape')  { el.innerHTML=renderLandscape(d); setTimeout(()=>barChart('sch',d),80); }
+  else if(tab==='epo')     el.innerHTML=renderEPO(d._epo || lastEPO);
+  else if(tab==='whitespace') el.innerHTML=renderWS(d);
+  else if(tab==='assignees')  el.innerHTML=renderAssignees(d);
+  else                        el.innerHTML=renderPatents(d);
+}
+
+// ── Render functions ──────────────────────────────────────────────────────────
+function renderLandscape(d) {
+  const chips=(d.cpc_codes||[]).map(c=>`<span class="chip">${c}</span>`).join('');
+  const isLive = d._epo?.total_results > 0;
+  const srcLbl = isLive
+    ? `<span style="font-size:10px;background:#eaf8f2;color:#0F6E56;border:1px solid #b5e8d5;padding:2px 7px;border-radius:20px;">📡 EPO live · ${d._epo.total_results.toLocaleString()} patents</span>`
+    : `<span style="font-size:10px;background:#fdf1dc;color:#854F0B;border:1px solid #f0d49a;padding:2px 7px;border-radius:20px;">🤖 AI estimate</span>`;
+  return `<div class="rblock">
+    <div class="shdr"><span>Landscape overview ${d._family?`<span class="fb" style="margin-left:6px;">${d._family}</span>`:''}</span>${srcLbl}</div>
+    <div class="mets">
+      <div class="met"><div class="met-lbl">Active patents</div><div class="met-val">${(d.estimated_active_patents||0).toLocaleString()}</div><div class="met-sub">${isLive?'from EPO':'estimated'}</div></div>
+      <div class="met"><div class="met-lbl">Pending filings</div><div class="met-val">${(d.estimated_pending||0).toLocaleString()}</div><div class="met-sub">estimated</div></div>
+      <div class="met"><div class="met-lbl">Activity score</div><div class="met-val">${d.activity_score||'—'}<span style="font-size:12px;font-weight:400">/10</span></div><div class="met-sub">crowding</div></div>
+      <div class="met"><div class="met-lbl">Filing trend</div><div class="met-val" style="font-size:14px;color:${tc(d.filing_trend)}">${d.filing_trend||'—'}</div><div class="met-sub">momentum</div></div>
+    </div>
+    <div class="card"><div class="prose">${(d.landscape_summary||'').split('\n').filter(Boolean).map(p=>`<p>${p}</p>`).join('')}</div><div class="cpc-chips">${chips}</div></div>
+    <div class="shdr">Patent status distribution</div>
+    <div class="chart-wrap"><canvas id="sch" role="img" aria-label="Estimated patent counts by status"></canvas></div>
+    <div class="strat"><div class="strat-lbl">Strategic recommendation</div><div class="strat-txt">${d.strategic_recommendation||''}</div></div>
+    <div class="erow">
+      <button class="btn-s" onclick="alert('Export feature — send this analysis via the FTO memo prompt below')">📋 FTO memo ↗</button>
+      <button class="btn-s" onclick="alert('Open a chat for partnership target analysis')">🤝 Partnership targets ↗</button>
+      <button class="btn-s" onclick="exportPDF()">⬇ Export PDF report</button>
+    </div>
+  </div>`;
+}
+
+function renderEPO(epo) {
+  if (!epo || !epo.patents?.length) {
+    return `<div class="empty"><div class="empty-ic">📡</div><p>No live EPO data retrieved for this query.<br>The analysis above is based on AI estimates.<br><br>Try selecting a more specific chemistry family or adding CPC codes to your query.</p></div>`;
+  }
+  const items = epo.patents.map(p=>`
+    <div class="epo-item">
+      <div class="epo-itm-ttl">${p.title}</div>
+      <div class="epo-itm-meta">
+        <span>📋 ${p.number||'—'}</span>
+        <span>🏢 ${p.assignee||'—'}</span>
+        <span>📅 ${p.year||'—'}</span>
+        ${p.cpc_codes?.length?`<span>🔖 ${p.cpc_codes.join(', ')}</span>`:''}
+      </div>
+      ${p.abstract&&p.abstract!=='Abstract not available.'?`<div class="pab" style="margin-top:5px;">${p.abstract.slice(0,200)}…</div>`:''}
+    </div>`).join('');
+  const assigneeRows = (epo.top_assignees||[]).slice(0,6).map((a,i)=>{
+    const max=Math.max(...(epo.top_assignees||[]).map(x=>x.count||1),1);
+    return `<div class="arow"><span class="arn">${i+1}</span><div class="ain"><div class="anm">${a.name}</div></div><div class="abw"><div class="ab" style="width:${Math.round((a.count/max)*100)}%"></div></div><span class="acnt">${a.count}</span></div>`;
+  }).join('');
+  return `<div class="rblock">
+    <div class="shdr">Live EPO results <span style="font-size:10px;background:#eaf8f2;color:#0F6E56;padding:2px 7px;border-radius:20px;">${epo.total_results?.toLocaleString()||0} total</span></div>
+    <div style="font-size:11px;color:#bbb;margin-bottom:10px;font-family:monospace;background:#f7f7f5;padding:7px 10px;border-radius:6px;">Query: ${epo.query_used||'—'}</div>
+    <div class="epo-panel">
+      <div class="epo-header">
+        <span class="epo-title">📡 EPO patent records <span style="font-weight:400;color:#0F6E56;">(${epo.retrieved||0} retrieved)</span></span>
+      </div>
+      <div class="epo-list">${items}</div>
+    </div>
+    ${assigneeRows?`<div class="shdr" style="margin-top:1rem;">Top assignees in results</div><div style="margin-bottom:1rem;">${assigneeRows}</div>`:''}
+  </div>`;
+}
+
+function renderWS(d) {
+  const o=(d.whitespace_opportunities||[]).map(x=>`<div class="ws opp"><div class="ws-ttl">${x.title}<span class="sbg s${x.strength?.charAt(0)||'m'}">${x.strength}</span></div><div class="ws-body">${x.description}</div></div>`).join('');
+  const r=(d.blocking_risks||[]).map(x=>`<div class="ws risk"><div class="ws-ttl">${x.title}<span class="sbg s${x.severity?.charAt(0)||'m'}">${x.severity}</span></div><div class="ws-body">${x.description}</div></div>`).join('');
+  return `<div class="rblock"><div class="shdr">Filing opportunities</div><div class="ws-grid">${o}</div><div class="shdr">Blocking risks</div><div class="ws-grid">${r}</div></div>`;
+}
+
+function renderAssignees(d) {
+  const list=d.top_assignees||[];
+  const mx=Math.max(...list.map(a=>a.patent_count||1),1);
+  return `<div class="rblock"><div class="shdr">Top assignees by estimated filings</div>
+    <div style="margin-bottom:1rem;">${list.map((a,i)=>`<div class="arow"><span class="arn">${i+1}</span><div class="ain"><div class="anm">${a.name}</div><div class="afoc">${a.type||''} · ${a.focus||''}</div></div><div class="abw"><div class="ab" style="width:${Math.round((a.patent_count/mx)*100)}%"></div></div><span class="acnt">${a.patent_count}</span></div>`).join('')}</div>
+  </div>`;
+}
+
+function renderPatents(d) {
+  const bc=s=>s==='active'?'ba':s==='expired'?'be':'bf';
+
+  // Use real EPO patents if available, supplement with AI representative patents
+  const epoPatents = (d._epo_patents || []).map(p => ({
+    title: p.title,
+    assignee: p.assignee,
+    year: p.year,
+    status: p.status || 'active',
+    abstract: p.abstract || '',
+    number: p.number || '',
+    source: 'epo'
+  }));
+
+  const aiPatents = (d.representative_patents || []).map(p => ({...p, source: 'ai'}));
+
+  // Prefer EPO records; pad with AI ones if fewer than 5 EPO records
+  const patents = epoPatents.length > 0
+    ? [...epoPatents, ...aiPatents.slice(0, Math.max(0, 5 - epoPatents.length))]
+    : aiPatents;
+
+  const sourceLabel = epoPatents.length > 0
+    ? `<span style="font-size:10px;background:#eaf8f2;color:#0F6E56;padding:2px 7px;border-radius:20px;margin-left:8px;">📡 ${epoPatents.length} from EPO</span>`
+    : `<span style="font-size:10px;background:#fdf1dc;color:#854F0B;padding:2px 7px;border-radius:20px;margin-left:8px;">🤖 AI generated</span>`;
+
+  return `<div class="rblock">
+    <div class="shdr">Representative patents ${sourceLabel}</div>
+    ${patents.length === 0
+      ? '<div class="empty"><div class="empty-ic">📄</div><p>No patents retrieved. Try running a search first.</p></div>'
+      : patents.map(p=>`<div class="pat">
+          <div class="pt">
+            <span class="pttl">${p.title}</span>
+            <span class="pbdg ${bc(p.status)}">${p.status||'active'}</span>
+          </div>
+          <div class="pmt">
+            <span>🏢 ${p.assignee||'—'}</span>
+            <span>📅 ${p.year||'—'}</span>
+            <span style="font-family:monospace;font-size:10px;">${p.number||''}</span>
+            ${p.source==='epo'?'<span style="color:#0F6E56;font-size:10px;">📡 EPO</span>':'<span style="color:#aaa;font-size:10px;">🤖 AI</span>'}
+          </div>
+          ${p.abstract?`<div class="pab">${p.abstract.slice(0,300)}${p.abstract.length>300?'…':''}</div>`:''}
+        </div>`).join('')
+    }
+  </div>`;
+}
+
+function barChart(id,d) {
+  const c=document.getElementById(id);
+  if(!c||!window.Chart) return;
+  new Chart(c,{type:'bar',data:{labels:['Active','Expired','Pending'],datasets:[{data:[d.estimated_active_patents||0,d.estimated_expired_patents||0,d.estimated_pending||0],backgroundColor:['#1D9E75','#B4B2A9','#FAC775'],borderWidth:0,borderRadius:5}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{grid:{display:false},ticks:{font:{size:11}}},y:{grid:{color:'rgba(0,0,0,0.04)'},ticks:{font:{size:11}}}}}});
+}
+
+// ── Compare ───────────────────────────────────────────────────────────────────
+async function runComparison() {
+  if(!cmpA||!cmpB){document.getElementById('cmpResults').innerHTML=`<div class="err">Please select two chemistry families first.</div>`;return;}
+  const btn=document.getElementById('cmpBtn');
+  btn.disabled=true;btn.innerHTML='<span class="spin" style="display:inline-block;margin-right:6px;"></span>Comparing…';
+  showLoading('cmpResults');
+  const focus=document.getElementById('cmpQ').value.trim();
+  const call=async(fam)=>{
+    const res=await fetch(API.analyse,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({query:`${fam.nm}${focus?' focusing on: '+focus:''}`,family_id:fam.id})});
+    return res.json();
+  };
+  try {
+    const [dA,dB]=await Promise.all([call(cmpA),call(cmpB)]);
+    renderCmp(dA,dB);
+  } catch(e){document.getElementById('cmpResults').innerHTML=`<div class="err">Comparison failed: ${e.message}</div>`;}
+  btn.disabled=false;btn.innerHTML='⚖ Compare';
+}
+
+function renderCmp(dA,dB) {
+  const m2=(lbl,vA,vB,u='')=>`<div class="shdr">${lbl}</div><div class="met2">
+    <div class="met"><div class="met-lbl">${cmpA.nm}</div><div class="met-val">${vA||'—'}${u?`<span style="font-size:12px;font-weight:400">${u}</span>`:''}</div></div>
+    <div class="met"><div class="met-lbl">${cmpB.nm}</div><div class="met-val">${vB||'—'}${u?`<span style="font-size:12px;font-weight:400">${u}</span>`:''}</div></div>
+  </div>`;
+  const wsl=items=>(items||[]).slice(0,2).map(o=>`<div class="ws opp" style="margin-bottom:6px;"><div class="ws-ttl">${o.title}<span class="sbg s${o.strength?.charAt(0)||'m'}">${o.strength}</span></div><div class="ws-body">${o.description}</div></div>`).join('');
+  const al=list=>{const mx=Math.max(...(list||[]).map(a=>a.patent_count||1),1);return(list||[]).slice(0,4).map((a,i)=>`<div class="arow"><span class="arn">${i+1}</span><div class="ain"><div class="anm" style="font-size:11px;">${a.name}</div><div class="afoc">${a.focus||''}</div></div><div class="abw" style="width:70px;"><div class="ab" style="width:${Math.round((a.patent_count/mx)*100)}%"></div></div><span class="acnt">${a.patent_count}</span></div>`).join('');};
+  document.getElementById('cmpResults').innerHTML=`<div>
+    <div style="display:flex;gap:9px;margin-bottom:1rem;"><div class="cmph cha" style="flex:1;">${cmpA.nm}</div><div class="cmph chb" style="flex:1;">${cmpB.nm}</div></div>
+    ${m2('Active patents (est.)',dA.estimated_active_patents,dB.estimated_active_patents)}
+    ${m2('Activity score',dA.activity_score,dB.activity_score,'/10')}
+    ${m2('Filing trend',dA.filing_trend,dB.filing_trend)}
+    <div class="vsdiv">LANDSCAPE SUMMARIES</div>
+    <div class="cmp-grid">
+      <div class="card" style="font-size:12px;line-height:1.8;">${(dA.landscape_summary||'').split('\n').filter(Boolean)[0]||''}</div>
+      <div class="card" style="font-size:12px;line-height:1.8;">${(dB.landscape_summary||'').split('\n').filter(Boolean)[0]||''}</div>
+    </div>
+    <div class="vsdiv">WHITE SPACE OPPORTUNITIES</div>
+    <div class="cmp-grid"><div>${wsl(dA.whitespace_opportunities)}</div><div>${wsl(dB.whitespace_opportunities)}</div></div>
+    <div class="vsdiv">TOP ASSIGNEES</div>
+    <div class="cmp-grid"><div>${al(dA.top_assignees)}</div><div>${al(dB.top_assignees)}</div></div>
+    <div class="vsdiv">STRATEGIC RECOMMENDATION</div>
+    <div class="cmp-grid">
+      <div class="strat"><div class="strat-lbl">${cmpA.nm}</div><div class="strat-txt" style="font-size:12px;">${dA.strategic_recommendation||''}</div></div>
+      <div class="strat"><div class="strat-lbl">${cmpB.nm}</div><div class="strat-txt" style="font-size:12px;">${dB.strategic_recommendation||''}</div></div>
+    </div>
+  </div>`;
+}
+
+// ── Projects ──────────────────────────────────────────────────────────────────
+function showSaveBar(){
+  const bar=document.getElementById('saveBar');
+  bar.style.display=bar.style.display==='none'?'flex':'none';
+  if(bar.style.display==='flex'&&lastData) document.getElementById('projNameIn').value=(lastData._query||'').slice(0,50);
+}
+function confirmSave(){
+  const name=document.getElementById('projNameIn').value.trim();
+  if(!name||!lastData) return;
+  const ex=projects.find(p=>p.name===name);
+  if(ex){if(!ex.searches)ex.searches=[{data:ex.data,query:ex.query}];ex.searches.push({data:lastData,query:lastData._query||''});ex.savedAt=Date.now();}
+  else projects.push({name,family:lastData._family||'',query:lastData._query||'',data:lastData,searches:[{data:lastData,query:lastData._query||''}],savedAt:Date.now()});
+  saveProjectsLocal();
+  document.getElementById('saveBar').style.display='none';
+  updateBadge();
+  alert(`Saved to project "${name}".`);
+}
+function updateBadge(){const el=document.getElementById('projBadge');el.textContent=projects.length||'';}
+function renderProjects(){
+  document.getElementById('projDetail').style.display='none';
+  document.getElementById('projList').style.display='block';
+  updateBadge();
+  const el=document.getElementById('projList');
+  if(!projects.length){el.innerHTML=`<div class="pj-empty"><div style="font-size:28px;opacity:0.4;margin-bottom:10px;">📁</div><p>No saved projects yet.<br>Run an analysis and click <strong>Save</strong>.</p></div>`;return;}
+  el.innerHTML=projects.map((p,i)=>`<div class="pj-card" onclick="openProj(${i})"><div class="pj-info"><div class="pj-name">${p.name}</div><div class="pj-meta"><span class="fb">${p.family||'—'}</span>${(p.searches?.length||1)} search${(p.searches?.length||1)>1?'es':''} · ${new Date(p.savedAt).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'})}</div></div><div class="pj-acts"><button class="ibtn" onclick="event.stopPropagation();pjPDF(${i})" title="Export PDF">📄</button><button class="ibtn del" onclick="event.stopPropagation();delProj(${i})" title="Delete">🗑</button></div></div>`).join('');
+}
+function openProj(i){
+  const p=projects[i];
+  document.getElementById('projList').style.display='none';
+  const det=document.getElementById('projDetail');det.style.display='block';
+  det.innerHTML=`<div style="display:flex;align-items:center;gap:9px;margin-bottom:1rem;"><button class="btn-s" onclick="backProj()">← Projects</button><span style="font-size:15px;font-weight:700;color:#111;">${p.name}</span><span class="fb">${p.family||''}</span></div>
+  ${(p.searches||[{data:p.data,query:p.query}]).map((s,si)=>`<div style="margin-bottom:1.2rem;"><div class="shdr">Search ${si+1}: ${s.query||''}</div><div class="mets"><div class="met"><div class="met-lbl">Active patents</div><div class="met-val">${(s.data?.estimated_active_patents||0).toLocaleString()}</div></div><div class="met"><div class="met-lbl">Pending</div><div class="met-val">${(s.data?.estimated_pending||0).toLocaleString()}</div></div><div class="met"><div class="met-lbl">Activity</div><div class="met-val">${s.data?.activity_score||'—'}<span style="font-size:11px;font-weight:400">/10</span></div></div><div class="met"><div class="met-lbl">Trend</div><div class="met-val" style="font-size:13px;color:${tc(s.data?.filing_trend)}">${s.data?.filing_trend||'—'}</div></div></div><div class="strat"><div class="strat-lbl">Strategic recommendation</div><div class="strat-txt">${s.data?.strategic_recommendation||''}</div></div></div>`).join('')}
+  <div class="erow"><button class="btn-s" onclick="pjPDF(${i})">⬇ Export PDF report</button></div>`;
+}
+function backProj(){document.getElementById('projDetail').style.display='none';document.getElementById('projList').style.display='block';}
+function delProj(i){if(!confirm('Delete this project?'))return;projects.splice(i,1);saveProjectsLocal();renderProjects();}
+function pjPDF(i){const p=projects[i];lastData={...(p.searches?.[0]?.data||p.data),_query:p.query,_family:p.family};exportPDF();}
+
+// ── PDF export ────────────────────────────────────────────────────────────────
+function exportPDF(){
+  if(!lastData||!window.jspdf){alert('No analysis loaded.');return;}
+  const {jsPDF}=window.jspdf;
+  const doc=new jsPDF({orientation:'p',unit:'mm',format:'a4'});
+  const d=lastData; const W=210,M=18,TW=W-M*2; let y=20;
+  const add=(txt,x,sz,wt,col,mw)=>{doc.setFontSize(sz);doc.setFont('helvetica',wt||'normal');doc.setTextColor(...(col||[40,40,40]));const lines=doc.splitTextToSize(String(txt||''),mw||TW);doc.text(lines,x,y);y+=lines.length*(sz*0.42)+1.5;};
+  const ln=()=>{doc.setDrawColor(220,218,212);doc.line(M,y,W-M,y);y+=4;};
+  const sp=(n=4)=>{y+=n;};
+  const pg=()=>{if(y>248){doc.addPage();y=20;}};
+
+  doc.setFillColor(29,158,117);doc.rect(0,0,210,14,'F');
+  doc.setFontSize(10);doc.setFont('helvetica','bold');doc.setTextColor(255,255,255);
+  doc.text('CO₂ UTILISATION IP SCOUT',M,9);
+  doc.setFontSize(9);doc.setFont('helvetica','normal');
+  doc.text(`Patent Landscape Report · ${new Date().toLocaleDateString('en-GB',{day:'numeric',month:'long',year:'numeric'})}`,W-M,9,{align:'right'});
+  y=24;
+
+  add(d.query_interpretation||d._query||'Patent Landscape Report',M,15,'bold',[15,15,15]);
+  if(d._family) add(d._family,M,10,'normal',[29,158,117]);
+  if(d.data_source) add(`Data source: ${d.data_source}`,M,9,'normal',[150,150,150]);
+  sp(2);ln();
+
+  add('Overview',M,11,'bold',[70,70,70]);sp(1);
+  [['Active patents',d.estimated_active_patents],['Pending filings',d.estimated_pending],['Expired (est.)',d.estimated_expired_patents],['Activity score',`${d.activity_score}/10`],['Filing trend',d.filing_trend]].forEach(([l,v])=>{doc.setFontSize(9);doc.setFont('helvetica','normal');doc.setTextColor(120,120,120);doc.text(' '+l,M,y);doc.setFont('helvetica','bold');doc.setTextColor(40,40,40);doc.text(String(v||'—'),M+75,y);y+=5;});
+  sp(3);ln();
+
+  add('Landscape analysis',M,11,'bold',[70,70,70]);sp(1);
+  (d.landscape_summary||'').split('\n').filter(Boolean).forEach(p=>{pg();add(p,M,9,'normal',[60,60,60]);sp(2);});
+  ln();
+
+  add('CPC classification codes',M,11,'bold',[70,70,70]);sp(1);
+  (d.cpc_codes||[]).forEach(c=>{add('· '+c,M+2,9,'normal',[80,80,80]);});
+  sp(2);ln();pg();
+
+  add('White space opportunities',M,11,'bold',[70,70,70]);sp(1);
+  (d.whitespace_opportunities||[]).forEach(o=>{pg();add(`${o.title} [${o.strength}]`,M+2,9,'bold',[29,158,117]);add(o.description,M+4,9,'normal',[80,80,80],TW-6);sp(2);});
+  ln();pg();
+
+  add('Blocking risks',M,11,'bold',[70,70,70]);sp(1);
+  (d.blocking_risks||[]).forEach(r=>{pg();add(`${r.title} [${r.severity}]`,M+2,9,'bold',[185,80,40]);add(r.description,M+4,9,'normal',[80,80,80],TW-6);sp(2);});
+  ln();pg();
+
+  add('Top assignees',M,11,'bold',[70,70,70]);sp(1);
+  (d.top_assignees||[]).forEach((a,i)=>{add(`${i+1}. ${a.name} (${a.type}) — ${a.patent_count} patents · ${a.focus}`,M+2,9,'normal',[60,60,60]);});
+  sp(2);ln();pg();
+
+  add('Representative patents',M,11,'bold',[70,70,70]);sp(1);
+  (d.representative_patents||[]).forEach(p=>{pg();add(`${p.title} (${p.year}) — ${p.assignee} [${p.status}]`,M+2,9,'bold',[50,50,50]);add(p.abstract,M+4,8,'normal',[110,110,110],TW-6);sp(2);});
+  ln();pg();
+
+  add('Strategic recommendation',M,11,'bold',[70,70,70]);sp(1);
+  add(d.strategic_recommendation||'',M+2,9,'normal',[60,60,60]);
+
+  doc.save(`IP_Scout_${(d._family||'CO2').replace(/[^a-z0-9]/gi,'_')}_${Date.now()}.pdf`);
+}
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+buildGrids();
+loadProjects();
+updateBadge();
+document.getElementById('qIn').addEventListener('keydown',e=>{if(e.key==='Enter')runSearch();});
+document.getElementById('cmpQ').addEventListener('keydown',e=>{if(e.key==='Enter')runComparison();});
+</script>
+</body>
+</html>
