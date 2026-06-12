@@ -103,11 +103,13 @@ Return this JSON with ALL fields populated with real, specific content for this 
   "strategic_recommendation": "Three sentences: (1) FTO posture for this space, (2) highest priority filing areas, (3) best partnership or licensing angle."
 }`;
 
-  // Set SSE streaming headers
+  // Set SSE streaming headers — flushHeaders() sends them immediately so
+  // Vercel's proxy starts streaming instead of buffering the whole response
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache');
   res.setHeader('Connection', 'keep-alive');
   res.setHeader('X-Accel-Buffering', 'no');
+  res.flushHeaders();
 
   try {
     const response = await fetch('https://api.anthropic.com/v1/messages', {
@@ -119,7 +121,7 @@ Return this JSON with ALL fields populated with real, specific content for this 
       },
       body: JSON.stringify({
         model: 'claude-sonnet-4-6',
-        max_tokens: 2000,
+        max_tokens: 2500,
         stream: true,
         system,
         messages: [{ role: 'user', content: user }]

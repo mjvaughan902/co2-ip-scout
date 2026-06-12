@@ -74,7 +74,8 @@ function normalisePatent(doc) {
     const titles = ensureArray(titleSrc);
     const title = titles.map(t => extractText(t)).filter(Boolean)[0] || 'Untitled';
 
-    const appParties = biblio['parties']?.['applicants']?.['applicant'] || [];
+    const partiesSrc = biblio['parties'] || doc['parties'] || {};
+    const appParties = partiesSrc?.['applicants']?.['applicant'] || [];
     const assignees = ensureArray(appParties)
       .filter(a => a?.['@data-format'] === 'epodoc')
       .map(a => extractText(a?.['applicant-name']?.['name']))
