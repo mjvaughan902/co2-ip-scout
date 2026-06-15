@@ -8,6 +8,9 @@
     },
     "api/ai-analyse.js": {
       "maxDuration": 60
+    },
+    "api/nl-to-query.js": {
+      "maxDuration": 15
     }
   }
 }

@@ -187,6 +187,48 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 .pt-inf { background: #e8f4f0; color: #2a8c70; }
 .pt-ai  { background: #f0eeea; color: #888; }
 
+/* NL query hint */
+.nl-hint { margin: 5px 0 2px 2px; display: flex; flex-direction: column; gap: 3px; }
+.nl-interp { font-size: 12px; color: #1D9E75; font-style: italic; }
+.nl-query-row { display: flex; align-items: center; gap: 6px; }
+.nl-query-lbl { font-size: 10px; color: #bbb; }
+.nl-query-code { font-size: 11px; font-family: 'SF Mono','Fira Code',monospace; color: #888; background: #f0eeea; padding: 2px 7px; border-radius: 4px; }
+.nl-translating { font-size: 11px; color: #bbb; display: flex; align-items: center; gap: 6px; }
+
+/* Whitespace panel */
+.ws-panel-hdr { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem; }
+.ws-summary { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 1.2rem; }
+.ws-sum-card { background: #fff; border: 1px solid #e4e2dc; border-radius: 8px; padding: 10px 14px; text-align: center; }
+.ws-sum-val { font-size: 22px; font-weight: 700; color: #111; line-height: 1; margin-bottom: 3px; }
+.ws-sum-lbl { font-size: 10px; color: #bbb; text-transform: uppercase; letter-spacing: 0.07em; }
+.ws-opp-card { background: #fff; border: 1px solid #e4e2dc; border-left: 4px solid #1D9E75; border-radius: 0 8px 8px 0; padding: 12px 14px; margin-bottom: 8px; }
+.ws-opp-card.med { border-left-color: #7ecbb5; }
+.ws-opp-card.low { border-left-color: #d0cec8; }
+.ws-risk-card { background: #fff; border: 1px solid #e4e2dc; border-left: 4px solid #D85A30; border-radius: 0 8px 8px 0; padding: 12px 14px; margin-bottom: 8px; }
+.ws-risk-card.med { border-left-color: #e89070; }
+.ws-risk-card.low { border-left-color: #e0ccc8; }
+.ws-card-ttl { font-size: 13px; font-weight: 600; color: #222; margin-bottom: 5px; display: flex; align-items: center; gap: 8px; }
+.ws-card-body { font-size: 12px; color: #666; line-height: 1.7; }
+.ws-strength { font-size: 10px; padding: 2px 8px; border-radius: 20px; font-weight: 600; }
+.ws-sh { background: #eaf8f2; color: #0F6E56; }
+.ws-sm { background: #fdf1dc; color: #854F0B; }
+.ws-sl { background: #f0eeea; color: #888; }
+.ws-rh { background: #fef0ee; color: #993C1D; }
+.ws-rm { background: #fdf5dc; color: #7a5800; }
+.ws-rl { background: #f0eeea; color: #888; }
+
+/* Ask AI box */
+.ask-ai-box { background: #f7f7f5; border: 1px solid #e4e2dc; border-radius: 10px; padding: 14px 16px; margin-top: 1.2rem; }
+.ask-ai-hdr { font-size: 11px; font-weight: 700; letter-spacing: 0.07em; text-transform: uppercase; color: #aaa; margin-bottom: 10px; display: flex; align-items: center; gap: 8px; }
+.ask-ai-row { display: flex; gap: 8px; }
+.ask-ai-input { flex: 1; padding: 8px 12px; font-size: 13px; border: 1px solid #d0cec8; border-radius: 7px; background: #fff; color: #111; font-family: inherit; }
+.ask-ai-input:focus { outline: none; border-color: #1D9E75; box-shadow: 0 0 0 3px rgba(29,158,117,0.1); }
+.ask-ai-chips { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 9px; }
+.ask-chip { padding: 3px 10px; font-size: 11px; border: 1px solid #d0cec8; border-radius: 20px; cursor: pointer; color: #666; background: #fff; }
+.ask-chip:hover { border-color: #1D9E75; color: #0F6E56; background: #eaf8f2; }
+.ask-ai-answer { margin-top: 10px; padding: 10px 13px; background: #fff; border: 1px solid #e4e2dc; border-radius: 8px; font-size: 13px; color: #333; line-height: 1.75; display: none; }
+.ask-ai-answer.visible { display: block; }
+
 /* Projects */
 .pj-card { background: #fff; border: 1px solid #e4e2dc; border-radius: 8px; padding: 10px 14px; display: flex; align-items: center; gap: 10px; cursor: pointer; margin-bottom: 7px; }
 .pj-card:hover { border-color: #bbb; }
@@ -232,10 +274,13 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
     <div class="slbl">Chemistry family</div>
     <div class="fgrid" id="famGrid"></div>
     <div class="srow">
-      <input class="sinput" id="qIn" type="text" placeholder="Describe your technology — use AND / OR for precise queries, e.g. "methanol AND copper OR formate"" />
+      <input class="sinput" id="qIn" type="text" placeholder="Describe your technology in plain language — e.g. "copper catalyst for converting CO2 to methanol at low temperature"" />
       <button class="btn-p" id="searchBtn" onclick="runSearch()">🔍 Analyse</button>
     </div>
-    <div id="queryHint" style="display:none;font-size:11px;color:#888;margin:4px 0 0 2px;">EPO query: <code id="queryHintText"></code></div>
+    <div id="nlHint" style="display:none;" class="nl-hint">
+      <div class="nl-interp" id="nlInterpretation"></div>
+      <div class="nl-query-row"><span class="nl-query-lbl">EPO query:</span> <code class="nl-query-code" id="queryHintText"></code></div>
+    </div>
     <div class="jrow">
       <span class="jlbl">Jurisdiction:</span>
       <span class="jpill jsel" id="jp-ALL" onclick="toggleJurisdiction('ALL')">🌍 All</span>
@@ -308,7 +353,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 // ── Config ───────────────────────────────────────────────────────────────────
 // In production these calls go to /api/* (same-origin Vercel functions).
 // For local dev with `vercel dev` this also works out of the box.
-const API = { search: '/api/epo-search', analyse: '/api/ai-analyse', stream: '/api/ai-stream' };
+const API = { search: '/api/epo-search', analyse: '/api/ai-analyse', stream: '/api/ai-stream', nlQuery: '/api/nl-to-query' };
 
 // ── Chemistry families ────────────────────────────────────────────────────────
 const FAMILIES = [
@@ -411,17 +456,45 @@ async function runSearch() {
   document.getElementById('pdfBtn').style.display='none';
   document.getElementById('saveBtn').style.display='none';
   document.getElementById('saveBar').style.display='none';
+  document.getElementById('nlHint').style.display='none';
 
   const cpcCodes = activeFamily?.cpc || [];
   let epoData = null;
+  let epoKeywords = query;  // may be replaced by NL translation
 
-  // Step 1: EPO search — fast, updates badge immediately
+  // Step 1: NL → EPO query translation (fast, uses Haiku)
   showLoading('resultsArea');
+  updateLoadingStep('Interpreting your technology description…');
+  try {
+    const nlRes = await fetch(API.nlQuery, {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ description: query, jurisdictions: selectedJurisdictions })
+    });
+    if (nlRes.ok) {
+      const nlData = await nlRes.json();
+      if (nlData.epo_query) {
+        epoKeywords = nlData.epo_query;
+        // Show interpretation to user
+        const hintEl = document.getElementById('nlHint');
+        hintEl.style.display = 'block';
+        if (nlData.interpretation && !nlData.passthrough) {
+          document.getElementById('nlInterpretation').textContent = '✦ ' + nlData.interpretation;
+        } else {
+          document.getElementById('nlInterpretation').textContent = '';
+        }
+        document.getElementById('queryHintText').textContent = nlData.epo_query;
+      }
+    }
+  } catch(e) {
+    console.warn('NL translation failed, using raw query:', e.message);
+  }
+
+  // Step 2: EPO search using translated query
   updateLoadingStep('Querying EPO patent database…');
   try {
     const epoRes = await fetch(API.search, {
       method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ cpc_codes: cpcCodes, keywords: query, jurisdictions: selectedJurisdictions })
+      body: JSON.stringify({ cpc_codes: cpcCodes, keywords: epoKeywords, jurisdictions: selectedJurisdictions })
     });
     if (epoRes.ok) {
       epoData = await epoRes.json();
@@ -438,8 +511,9 @@ async function runSearch() {
         badge.textContent=`EPO unavailable — AI estimates only`;
         console.warn('EPO error:', epoData.error, epoData.detail||'');
       }
+      // Update query hint with what EPO actually used
       if (epoData.query_used) {
-        document.getElementById('queryHint').style.display='block';
+        document.getElementById('nlHint').style.display='block';
         document.getElementById('queryHintText').textContent = epoData.query_used;
       }
     }
@@ -672,9 +746,77 @@ function renderProvenance(d) {
 }
 
 function renderWS(d) {
-  const o=(d.whitespace_opportunities||[]).map(x=>`<div class="ws opp"><div class="ws-ttl">${x.title}<span class="sbg s${x.strength?.charAt(0)||'m'}">${x.strength}</span></div><div class="ws-body">${x.description}</div></div>`).join('');
-  const r=(d.blocking_risks||[]).map(x=>`<div class="ws risk"><div class="ws-ttl">${x.title}<span class="sbg s${x.severity?.charAt(0)||'m'}">${x.severity}</span></div><div class="ws-body">${x.description}</div></div>`).join('');
-  return `<div class="rblock"><div class="shdr">Filing opportunities</div><div class="ws-grid">${o}</div><div class="shdr">Blocking risks</div><div class="ws-grid">${r}</div></div>`;
+  const opps = d.whitespace_opportunities || [];
+  const risks = d.blocking_risks || [];
+  const highOpps = opps.filter(x => x.strength === 'high').length;
+  const highRisks = risks.filter(x => x.severity === 'high').length;
+
+  const strengthClass = s => s === 'high' ? '' : s === 'medium' ? ' med' : ' low';
+  const strengthBadge = s => `<span class="ws-strength ws-s${s?.charAt(0)||'m'}">${s||'medium'}</span>`;
+  const severityClass  = s => s === 'high' ? '' : s === 'medium' ? ' med' : ' low';
+  const severityBadge  = s => `<span class="ws-strength ws-r${s?.charAt(0)||'m'}">${s||'medium'}</span>`;
+
+  const oppCards = opps.map(x => `
+    <div class="ws-opp-card${strengthClass(x.strength)}">
+      <div class="ws-card-ttl">${x.title} ${strengthBadge(x.strength)}</div>
+      <div class="ws-card-body">${x.description}</div>
+    </div>`).join('');
+
+  const riskCards = risks.map(x => `
+    <div class="ws-risk-card${severityClass(x.severity)}">
+      <div class="ws-card-ttl">${x.title} ${severityBadge(x.severity)}</div>
+      <div class="ws-card-body">${x.description}</div>
+    </div>`).join('');
+
+  const isLive = d._epo?.total_results > 0;
+  const srcNote = isLive
+    ? `<span style="font-size:10px;background:#eaf8f2;color:#0F6E56;padding:2px 7px;border-radius:20px;">📡 Grounded in ${d._epo.total_results.toLocaleString()} EPO patents</span>`
+    : `<span style="font-size:10px;background:#fdf1dc;color:#854F0B;padding:2px 7px;border-radius:20px;">🤖 AI analysis</span>`;
+
+  const suggestedQuestions = [
+    'Which opportunities are defensible with a single filing?',
+    'Where should we file first to establish priority?',
+    'Which blocking risks could be designed around?',
+    'Who are the key assignees in the high-risk areas?'
+  ];
+
+  return `<div class="rblock">
+    <div class="ws-panel-hdr">
+      <div class="shdr" style="margin-bottom:0;">Strategic white space ${srcNote}</div>
+    </div>
+    <div class="ws-summary">
+      <div class="ws-sum-card">
+        <div class="ws-sum-val" style="color:#1D9E75;">${opps.length}</div>
+        <div class="ws-sum-lbl">Filing opportunities</div>
+      </div>
+      <div class="ws-sum-card">
+        <div class="ws-sum-val" style="color:#1D9E75;">${highOpps}</div>
+        <div class="ws-sum-lbl">High-strength gaps</div>
+      </div>
+      <div class="ws-sum-card">
+        <div class="ws-sum-val" style="color:#D85A30;">${highRisks}</div>
+        <div class="ws-sum-lbl">High-severity risks</div>
+      </div>
+    </div>
+
+    <div class="shdr">Filing opportunities — ranked by strength</div>
+    ${oppCards || '<div class="empty" style="padding:1rem;"><p>No opportunities identified.</p></div>'}
+
+    <div class="shdr" style="margin-top:1.2rem;">Blocking risks — ranked by severity</div>
+    ${riskCards || '<div class="empty" style="padding:1rem;"><p>No blocking risks identified.</p></div>'}
+
+    <div class="ask-ai-box" id="askAiBox">
+      <div class="ask-ai-hdr">✦ Ask AI about this landscape</div>
+      <div class="ask-ai-chips">
+        ${suggestedQuestions.map(q => `<span class="ask-chip" onclick="fillAskAI('${q.replace(/'/g,"\\'")}')">  ${q}</span>`).join('')}
+      </div>
+      <div class="ask-ai-row">
+        <input class="ask-ai-input" id="askAiInput" placeholder="Ask a follow-up question about this patent landscape…" />
+        <button class="btn-p" onclick="submitAskAI()" id="askAiBtn">Ask</button>
+      </div>
+      <div class="ask-ai-answer" id="askAiAnswer"></div>
+    </div>
+  </div>`;
 }
 
 function renderAssignees(d) {
@@ -877,6 +1019,94 @@ function exportPDF(){
   add(d.strategic_recommendation||'',M+2,9,'normal',[60,60,60]);
 
   doc.save(`IP_Scout_${(d._family||'CO2').replace(/[^a-z0-9]/gi,'_')}_${Date.now()}.pdf`);
+}
+
+// ── Ask AI follow-up ─────────────────────────────────────────────────────────
+function fillAskAI(q) {
+  const inp = document.getElementById('askAiInput');
+  if (inp) { inp.value = q; inp.focus(); }
+}
+
+async function submitAskAI() {
+  const inp = document.getElementById('askAiInput');
+  const answerEl = document.getElementById('askAiAnswer');
+  const btn = document.getElementById('askAiBtn');
+  if (!inp || !answerEl || !btn) return;
+  const question = inp.value.trim();
+  if (!question || !lastData) return;
+
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spin" style="display:inline-block;margin-right:5px;"></span>';
+  answerEl.className = 'ask-ai-answer visible';
+  answerEl.textContent = 'Thinking…';
+
+  const d = lastData;
+  const epo = d._epo;
+  const context = [
+    `Technology: ${d._query || d.chemistry_family}`,
+    `Landscape: ${(d.landscape_summary || '').slice(0, 400)}`,
+    `Filing opportunities: ${(d.whitespace_opportunities || []).map(o => o.title + ' — ' + o.description).join(' | ')}`,
+    `Blocking risks: ${(d.blocking_risks || []).map(r => r.title + ' — ' + r.description).join(' | ')}`,
+    `Top assignees: ${(d.top_assignees || []).slice(0, 5).map(a => a.name).join(', ')}`,
+    epo?.total_results ? `EPO database: ${epo.total_results.toLocaleString()} matching patents` : '',
+    `Strategic recommendation: ${d.strategic_recommendation || ''}`
+  ].filter(Boolean).join('\n');
+
+  try {
+    const apiKey = '';  // client-side call goes through our stream endpoint instead
+    // Route through ai-stream with a special ask_followup flag using fetch + SSE
+    const res = await fetch(API.stream, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        query: question,
+        ask_followup: true,
+        followup_context: context,
+        family_id: d._family || null
+      })
+    });
+
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+    let fullText = '';
+    answerEl.textContent = '';
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop();
+      for (const line of lines) {
+        if (!line.startsWith('data:')) continue;
+        try {
+          const event = JSON.parse(line.slice(5).trim());
+          if (event.type === 'delta') {
+            fullText += event.text;
+            answerEl.textContent = fullText;
+          } else if (event.type === 'complete') {
+            if (event.data?.answer) {
+              answerEl.textContent = event.data.answer;
+            } else if (fullText) {
+              answerEl.textContent = fullText;
+            }
+          } else if (event.type === 'error') {
+            answerEl.textContent = 'Could not get an answer. Please try again.';
+          }
+        } catch { /* skip */ }
+      }
+    }
+    if (!answerEl.textContent || answerEl.textContent === 'Thinking…') {
+      answerEl.textContent = 'No answer returned. Please try rephrasing your question.';
+    }
+  } catch(e) {
+    answerEl.textContent = `Error: ${e.message}`;
+  }
+  btn.disabled = false;
+  btn.innerHTML = 'Ask';
 }
 
 // ── Init ──────────────────────────────────────────────────────────────────────

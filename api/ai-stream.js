@@ -12,8 +12,53 @@ module.exports = async function handler(req, res) {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) return res.status(500).json({ error: 'ANTHROPIC_API_KEY not set' });
 
-  const { query, family_id, real_patent_data } = req.body || {};
+  const { query, family_id, real_patent_data, ask_followup, followup_context } = req.body || {};
   if (!query) return res.status(400).json({ error: 'query required' });
+
+  // ── Follow-up Q&A mode ────────────────────────────────────────────────────
+  if (ask_followup && followup_context) {
+    const fSystem = `You are a specialist patent intelligence analyst for CO2 utilisation chemistry. Answer the user's question concisely and specifically, grounded in the patent landscape data provided. Be direct — 2-4 sentences maximum. Do not add preamble or sign-off.`;
+    const fUser = `Patent landscape context:\n${followup_context}\n\nQuestion: ${query}`;
+
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+    res.setHeader('X-Accel-Buffering', 'no');
+    res.flushHeaders();
+
+    try {
+      const fRes = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: { 'x-api-key': apiKey, 'anthropic-version': '2023-06-01', 'Content-Type': 'application/json' },
+        body: JSON.stringify({ model: 'claude-haiku-4-5-20251001', max_tokens: 400, stream: true, system: fSystem, messages: [{ role: 'user', content: fUser }] })
+      });
+      if (!fRes.ok) {
+        res.write(`data: ${JSON.stringify({ type: 'error', message: `Anthropic error ${fRes.status}` })}\n\n`);
+        res.end(); return;
+      }
+      let fullText = '';
+      fRes.body.on('data', chunk => {
+        for (const line of chunk.toString().split('\n')) {
+          if (!line.startsWith('data:')) continue;
+          const data = line.slice(5).trim();
+          if (data === '[DONE]') return;
+          try {
+            const ev = JSON.parse(data);
+            if (ev.type === 'content_block_delta' && ev.delta?.text) {
+              fullText += ev.delta.text;
+              res.write(`data: ${JSON.stringify({ type: 'delta', text: ev.delta.text })}\n\n`);
+            }
+          } catch {}
+        }
+      });
+      fRes.body.on('end', () => { res.write(`data: ${JSON.stringify({ type: 'complete', data: { answer: fullText } })}\n\n`); res.end(); });
+      fRes.body.on('error', err => { res.write(`data: ${JSON.stringify({ type: 'error', message: err.message })}\n\n`); res.end(); });
+    } catch(err) {
+      res.write(`data: ${JSON.stringify({ type: 'error', message: err.message })}\n\n`);
+      res.end();
+    }
+    return;
+  }
 
   // Build EPO grounding context
   let epoContext = '';
