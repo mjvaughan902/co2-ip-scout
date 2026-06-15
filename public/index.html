@@ -421,7 +421,7 @@ async function runSearch() {
   try {
     const epoRes = await fetch(API.search, {
       method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ cpc_codes: cpcCodes, keywords: query, range:'1-25', jurisdictions: selectedJurisdictions })
+      body: JSON.stringify({ cpc_codes: cpcCodes, keywords: query, jurisdictions: selectedJurisdictions })
     });
     if (epoRes.ok) {
       epoData = await epoRes.json();
@@ -456,7 +456,8 @@ async function runSearch() {
           total_results:    epoData.total_results,
           top_assignees:    epoData.top_assignees,
           year_distribution:epoData.year_distribution,
-          sample_patents:   epoData.patents?.slice(0,10)
+          sample_patents:   epoData.patents,
+          retrieved:        epoData.retrieved
         } : null
       })
     });

@@ -23,41 +23,67 @@ module.exports = async function handler(req, res) {
   if (hasRealData) {
     dataSource = 'EPO OPS live data';
     const total = real_patent_data.total_results;
+    const retrieved = real_patent_data.retrieved || 0;
 
+    // Top 15 assignees with counts
     const assignees = (real_patent_data.top_assignees || [])
-      .slice(0, 8)
-      .map(a => `${a.name} (${a.count} patents)`)
+      .map(a => `${a.name} (${a.count})`)
       .join(', ');
 
+    // Full year distribution sorted newest first
     const years = real_patent_data.year_distribution || {};
-    const recentYears = Object.entries(years)
+    const yearLines = Object.entries(years)
       .sort((a, b) => parseInt(b[0]) - parseInt(a[0]))
-      .slice(0, 8)
       .map(([y, n]) => `${y}:${n}`)
       .join(', ');
 
-    const sampleTitles = (real_patent_data.sample_patents || [])
-      .slice(0, 8)
+    // Determine trend from year distribution
+    const yearEntries = Object.entries(years).map(([y, n]) => [parseInt(y), n]).sort((a, b) => a[0] - b[0]);
+    const recentSum = yearEntries.filter(([y]) => y >= 2020).reduce((s, [, n]) => s + n, 0);
+    const olderSum  = yearEntries.filter(([y]) => y >= 2015 && y < 2020).reduce((s, [, n]) => s + n, 0);
+    const trendHint = recentSum > olderSum * 1.2 ? 'rising' : recentSum < olderSum * 0.8 ? 'declining' : 'stable';
+
+    // All patents as compressed one-liners (title | assignee | year) — token-efficient
+    const allPatents = real_patent_data.sample_patents || [];
+    const compressedList = allPatents
       .filter(p => p.title && p.title !== 'Untitled')
-      .map(p => `"${p.title}" — ${p.assignee || 'Unknown'} (${p.year || '?'})`)
-      .join('\n  ');
+      .map(p => `• ${p.title} — ${p.assignee || '?'} (${p.year || '?'})`)
+      .join('\n');
+
+    // Top 10 with abstracts for deeper grounding
+    const detailedRecords = allPatents
+      .filter(p => p.abstract && p.abstract.length > 20)
+      .slice(0, 10)
+      .map(p => `[${p.number || '?'}] "${p.title}" — ${p.assignee || '?'} (${p.year || '?'})\n  ${p.abstract}`)
+      .join('\n\n');
 
     epoContext = `
 
-LIVE EPO DATABASE RESULTS — ground your entire analysis in this real data:
-Total patents retrieved: ${total}
-Top assignees: ${assignees}
-Filing activity by year: ${recentYears}
-Sample patent records:
-  ${sampleTitles}
+LIVE EPO DATABASE RESULTS — base your entire analysis on this real data:
+Total matching patents in EPO database: ${total.toLocaleString()}
+Records retrieved and analysed: ${retrieved} (relevance sample + recent filings, deduplicated)
+
+TOP ASSIGNEES (ranked by patent count in this sample):
+${assignees}
+
+FILING ACTIVITY BY YEAR:
+${yearLines}
+Trend signal: ${trendHint} (2020-present vs 2015-2019)
+
+ALL RETRIEVED PATENT TITLES:
+${compressedList}
+
+KEY RECORDS WITH ABSTRACTS:
+${detailedRecords}
 
 INSTRUCTIONS:
-- Set estimated_active_patents to approximately ${Math.round(total * 0.65)}
-- Set estimated_expired_patents to approximately ${Math.round(total * 0.25)}
-- Set estimated_pending to approximately ${Math.round(total * 0.10)}
-- Use the actual assignee names above in your top_assignees list
-- Determine filing_trend from the year distribution (rising if recent years higher)
-- Reference real patterns you see in the patent titles in your landscape_summary`;
+- filing_trend must be "${trendHint}" — derived from the year data above
+- estimated_active_patents: approximately ${Math.round(total * 0.65)}
+- estimated_expired_patents: approximately ${Math.round(total * 0.25)}
+- estimated_pending: approximately ${Math.round(total * 0.10)}
+- top_assignees: use the actual organisation names from above, with realistic patent counts scaled from the sample
+- landscape_summary: reference specific assignees, technical approaches, and patterns visible in the patent titles
+- whitespace_opportunities and blocking_risks: ground in the actual assignees and technology areas visible above`;
   }
 
   const system = `You are a specialist patent intelligence analyst with deep expertise in CO2 utilisation and carbon conversion chemistry. You provide accurate, specific, domain-expert analysis grounded in real data when provided.
@@ -121,7 +147,7 @@ Return this JSON with ALL fields populated with real, specific content for this 
       },
       body: JSON.stringify({
         model: 'claude-sonnet-4-6',
-        max_tokens: 2500,
+        max_tokens: 3000,
         stream: true,
         system,
         messages: [{ role: 'user', content: user }]

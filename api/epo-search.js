@@ -25,10 +25,6 @@ const STOP = new Set([
 
 const CO2_TERMS = new Set(['co2','carbon','dioxide']);
 
-// Build an EPO CQL query from the user's keywords.
-// Supports explicit AND / OR operators: "methanol AND copper OR formate"
-// Without operators, falls back to auto-extracting up to 3 key terms AND'd together.
-// Always anchors on CO2 unless the user already mentioned it.
 function buildQuery(cpcCodes, keywords, jurisdictions) {
   const jFilter = jurisdictions && jurisdictions.length
     ? ` AND ${jurisdictions.length === 1 ? `pn=${jurisdictions[0]}*` : `(${jurisdictions.map(j => `pn=${j}*`).join(' OR ')})`}`
@@ -38,7 +34,7 @@ function buildQuery(cpcCodes, keywords, jurisdictions) {
 
   const hasCO2ref = /\bco2\b|\bcarbon.?dioxide\b/i.test(keywords);
 
-  // ── Explicit AND/OR mode ───────────────────────────────────────────────────
+  // ── Explicit AND/OR mode ──────────────────────────────────────────────────
   if (/\s+(AND|OR)\s+/i.test(keywords)) {
     const tokens = keywords.split(/\s+(AND|OR)\s+/i);
     const parts = [];
@@ -58,7 +54,7 @@ function buildQuery(cpcCodes, keywords, jurisdictions) {
     return (hasCO2ref ? queryStr : `ta=CO2 AND ${queryStr}`) + jFilter;
   }
 
-  // ── Free-text mode: auto-extract up to 3 key terms ────────────────────────
+  // ── Free-text mode: auto-extract up to 3 key terms ───────────────────────
   const words = keywords
     .replace(/[^\w\s]/g, ' ').split(/\s+/)
     .map(w => w.toLowerCase())
@@ -123,6 +119,29 @@ function normalisePatent(doc) {
   }
 }
 
+function parseSearchData(searchData) {
+  const bibSearch = searchData?.['ops:world-patent-data']?.['ops:biblio-search'];
+  const results = bibSearch?.['ops:search-result'];
+  const totalCount = parseInt(bibSearch?.['@total-result-count'] || '0');
+
+  const rawExDocs = results?.['exchange-documents'];
+  const exchangeDocsArr = Array.isArray(rawExDocs) ? rawExDocs : (rawExDocs ? [rawExDocs] : []);
+  const docList = exchangeDocsArr.length
+    ? exchangeDocsArr.flatMap(ed => ensureArray(ed?.['exchange-document']))
+    : ensureArray(results?.['exchange-document']);
+
+  const patents = docList.map(normalisePatent).filter(Boolean);
+  return { totalCount, patents };
+}
+
+async function fetchEPO(url, accessToken) {
+  const res = await fetch(url, {
+    headers: { 'Authorization': `Bearer ${accessToken}`, 'Accept': 'application/json' }
+  });
+  if (!res.ok) return null;
+  return res.json();
+}
+
 module.exports = async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
@@ -130,7 +149,7 @@ module.exports = async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
-  const { cpc_codes, keywords, range = '1-25', jurisdictions = [] } = req.body || {};
+  const { cpc_codes, keywords, jurisdictions = [] } = req.body || {};
 
   const consumerKey = process.env.EPO_CONSUMER_KEY;
   const consumerSecret = process.env.EPO_CONSUMER_SECRET;
@@ -154,68 +173,68 @@ module.exports = async function handler(req, res) {
     return res.status(502).json({ error: 'EPO auth failed', detail: err.message });
   }
 
-  // Search
-  const query = buildQuery(cpc_codes, keywords, jurisdictions);
-  let searchData;
+  const baseQuery = buildQuery(cpc_codes, keywords, jurisdictions);
+  const recentQuery = baseQuery + ' AND pd>=20200101';
+  const base = `https://ops.epo.org/3.2/rest-services/published-data/search/biblio`;
+
+  // Two parallel fetches: relevance (1-100) + recent filings (1-100, last 5 years)
+  let relevanceData, recentData;
   try {
-    const url = `https://ops.epo.org/3.2/rest-services/published-data/search/biblio?q=${encodeURIComponent(query)}&Range=${range}`;
-    const searchRes = await fetch(url, {
-      headers: { 'Authorization': `Bearer ${accessToken}`, 'Accept': 'application/json' }
-    });
-    if (!searchRes.ok) {
-      const errText = await searchRes.text();
-      return res.status(200).json({ error: `EPO search failed: ${searchRes.status}`, query, detail: errText.slice(0, 300), total_results: 0, patents: [] });
-    }
-    searchData = await searchRes.json();
+    [relevanceData, recentData] = await Promise.all([
+      fetchEPO(`${base}?q=${encodeURIComponent(baseQuery)}&Range=1-100`, accessToken),
+      fetchEPO(`${base}?q=${encodeURIComponent(recentQuery)}&Range=1-100`, accessToken)
+    ]);
   } catch (err) {
     return res.status(200).json({ error: 'EPO request failed', detail: err.message, total_results: 0, patents: [] });
   }
 
-  // Parse
+  if (!relevanceData) {
+    return res.status(200).json({ error: 'EPO search returned no data', total_results: 0, patents: [], query_used: baseQuery });
+  }
+
   try {
-    const bibSearch = searchData?.['ops:world-patent-data']?.['ops:biblio-search'];
-    const results = bibSearch?.['ops:search-result'];
-    const totalCount = parseInt(bibSearch?.['@total-result-count'] || '0');
+    const { totalCount, patents: relevancePatents } = parseSearchData(relevanceData);
+    const { patents: recentPatents } = recentData ? parseSearchData(recentData) : { patents: [] };
 
-    // exchange-documents can be an array of wrappers or a single wrapper object
-    const rawExDocs = results?.['exchange-documents'];
-    const exchangeDocsArr = Array.isArray(rawExDocs) ? rawExDocs : (rawExDocs ? [rawExDocs] : []);
-    const docList = exchangeDocsArr.length
-      ? exchangeDocsArr.flatMap(ed => ensureArray(ed?.['exchange-document']))
-      : ensureArray(results?.['exchange-document']);
+    // Deduplicate by patent number — relevance results take priority
+    const seen = new Set();
+    const allPatents = [];
+    for (const p of [...relevancePatents, ...recentPatents]) {
+      const key = p.number || p.title;
+      if (key && !seen.has(key)) {
+        seen.add(key);
+        allPatents.push(p);
+      }
+    }
 
-    const parseErrors = [];
-    const patents = docList.map((doc, i) => {
-      const r = normalisePatent(doc);
-      if (!r) parseErrors.push(i);
-      return r;
-    }).filter(Boolean);
-    const effectiveTotal = Math.max(totalCount, patents.length);
+    const effectiveTotal = Math.max(totalCount, allPatents.length);
 
+    // Aggregate assignees across full combined set
     const assigneeMap = {};
-    patents.forEach(p => {
+    allPatents.forEach(p => {
       if (p.assignee && p.assignee !== 'Unknown') {
         assigneeMap[p.assignee] = (assigneeMap[p.assignee] || 0) + 1;
       }
     });
     const topAssignees = Object.entries(assigneeMap)
       .sort((a, b) => b[1] - a[1])
-      .slice(0, 8)
+      .slice(0, 15)
       .map(([name, count]) => ({ name, count }));
 
     const yearDist = {};
-    patents.forEach(p => { if (p.year) yearDist[p.year] = (yearDist[p.year] || 0) + 1; });
+    allPatents.forEach(p => { if (p.year) yearDist[p.year] = (yearDist[p.year] || 0) + 1; });
 
     return res.status(200).json({
       total_results: effectiveTotal,
-      query_used: query,
-      patents,
+      query_used: baseQuery,
+      patents: allPatents,               // full combined set for display
       top_assignees: topAssignees,
       year_distribution: yearDist,
-      retrieved: patents.length,
-      _debug: { totalCount, docListLen: docList.length, parseErrors }
+      retrieved: allPatents.length,
+      relevance_count: relevancePatents.length,
+      recent_count: recentPatents.length,
     });
   } catch (err) {
-    return res.status(200).json({ error: 'Parse failed', detail: err.message, total_results: 0, patents: [], _debug: { stage: 'parse', raw_keys: Object.keys(searchData || {}) } });
+    return res.status(200).json({ error: 'Parse failed', detail: err.message, total_results: 0, patents: [] });
   }
 };
