@@ -427,17 +427,27 @@ async function runSearch() {
       epoData = await epoRes.json();
       lastEPO = epoData;
       const epoTotal = epoData.total_results ? parseInt(epoData.total_results) : 0;
+      const badge = document.getElementById('dataBadge');
       if (epoTotal > 0) {
-        const badge = document.getElementById('dataBadge');
+        const rec = epoData.retrieved || 0;
+        const recStr = rec > 0 ? ` · ${rec} retrieved` : '';
         badge.className='data-badge db-live';
-        badge.textContent=`Live EPO · ${epoTotal.toLocaleString()} patents found`;
+        badge.textContent=`Live EPO · ${epoTotal.toLocaleString()} patents${recStr}`;
+      } else if (epoData.error) {
+        badge.className='data-badge db-ai';
+        badge.textContent=`EPO unavailable — AI estimates only`;
+        console.warn('EPO error:', epoData.error, epoData.detail||'');
       }
       if (epoData.query_used) {
         document.getElementById('queryHint').style.display='block';
         document.getElementById('queryHintText').textContent = epoData.query_used;
       }
     }
-  } catch(e) { console.warn('EPO search failed:', e.message); }
+  } catch(e) {
+    console.warn('EPO search failed:', e.message);
+    document.getElementById('dataBadge').className='data-badge db-ai';
+    document.getElementById('dataBadge').textContent='EPO unavailable — AI estimates only';
+  }
 
   // Step 2: Streaming AI analysis grounded in real EPO data
   document.getElementById('resultsArea').innerHTML = `

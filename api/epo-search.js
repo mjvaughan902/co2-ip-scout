@@ -1,6 +1,27 @@
 // api/epo-search.js
 const fetch = require('node-fetch');
 
+// Cache the EPO access token for the lifetime of the warm serverless instance.
+// EPO tokens expire after 20 minutes; we refresh 2 minutes early to be safe.
+let _tokenCache = null;  // { token, expiresAt }
+
+async function getAccessToken(consumerKey, consumerSecret) {
+  const now = Date.now();
+  if (_tokenCache && _tokenCache.expiresAt > now) return _tokenCache.token;
+
+  const credentials = Buffer.from(`${consumerKey}:${consumerSecret}`).toString('base64');
+  const res = await fetch('https://ops.epo.org/3.2/auth/accesstoken', {
+    method: 'POST',
+    headers: { 'Authorization': `Basic ${credentials}`, 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: 'grant_type=client_credentials'
+  });
+  if (!res.ok) throw new Error(`EPO auth failed: ${res.status}`);
+  const td = await res.json();
+  const expiresIn = (td.expires_in || 1200) - 120;  // refresh 2 min before expiry
+  _tokenCache = { token: td.access_token, expiresAt: now + expiresIn * 1000 };
+  return _tokenCache.token;
+}
+
 function ensureArray(val) {
   if (!val) return [];
   return Array.isArray(val) ? val : [val];
@@ -157,33 +178,21 @@ module.exports = async function handler(req, res) {
     return res.status(500).json({ error: 'EPO credentials not configured.' });
   }
 
-  // Auth
+  // Auth — reuse cached token if still valid (tokens last 20 min)
   let accessToken;
   try {
-    const credentials = Buffer.from(`${consumerKey}:${consumerSecret}`).toString('base64');
-    const tokenRes = await fetch('https://ops.epo.org/3.2/auth/accesstoken', {
-      method: 'POST',
-      headers: { 'Authorization': `Basic ${credentials}`, 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: 'grant_type=client_credentials'
-    });
-    if (!tokenRes.ok) throw new Error(`Auth failed: ${tokenRes.status}`);
-    const td = await tokenRes.json();
-    accessToken = td.access_token;
+    accessToken = await getAccessToken(consumerKey, consumerSecret);
   } catch (err) {
     return res.status(502).json({ error: 'EPO auth failed', detail: err.message });
   }
 
   const baseQuery = buildQuery(cpc_codes, keywords, jurisdictions);
-  const recentQuery = baseQuery + ' AND pd>=20200101';
   const base = `https://ops.epo.org/3.2/rest-services/published-data/search/biblio`;
 
-  // Two parallel fetches: relevance (1-100) + recent filings (1-100, last 5 years)
-  let relevanceData, recentData;
+  // Primary fetch: relevance-sorted, up to 100 records
+  let relevanceData;
   try {
-    [relevanceData, recentData] = await Promise.all([
-      fetchEPO(`${base}?q=${encodeURIComponent(baseQuery)}&Range=1-100`, accessToken),
-      fetchEPO(`${base}?q=${encodeURIComponent(recentQuery)}&Range=1-100`, accessToken)
-    ]);
+    relevanceData = await fetchEPO(`${base}?q=${encodeURIComponent(baseQuery)}&Range=1-100`, accessToken);
   } catch (err) {
     return res.status(200).json({ error: 'EPO request failed', detail: err.message, total_results: 0, patents: [] });
   }
@@ -191,6 +200,13 @@ module.exports = async function handler(req, res) {
   if (!relevanceData) {
     return res.status(200).json({ error: 'EPO search returned no data', total_results: 0, patents: [], query_used: baseQuery });
   }
+
+  // Secondary fetch: recent filings only — runs only if primary succeeded, failures are non-fatal
+  let recentData = null;
+  try {
+    const recentQuery = baseQuery + ' AND pd>=20200101';
+    recentData = await fetchEPO(`${base}?q=${encodeURIComponent(recentQuery)}&Range=1-100`, accessToken);
+  } catch (_) { /* non-fatal — proceed with relevance results only */ }
 
   try {
     const { totalCount, patents: relevancePatents } = parseSearchData(relevanceData);
