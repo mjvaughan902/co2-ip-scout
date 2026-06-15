@@ -186,7 +186,10 @@ module.exports = async function handler(req, res) {
     return res.status(502).json({ error: 'EPO auth failed', detail: err.message });
   }
 
-  const baseQuery = buildQuery(cpc_codes, keywords, jurisdictions);
+  // If keywords is already a CQL string (from nl-to-query), use it directly.
+  // buildQuery is only for raw free-text user input.
+  const isPrebuiltCQL = keywords && /\bta=/.test(keywords);
+  const baseQuery = isPrebuiltCQL ? keywords : buildQuery(cpc_codes, keywords, jurisdictions);
   const base = `https://ops.epo.org/3.2/rest-services/published-data/search/biblio`;
 
   // Primary fetch: relevance-sorted, up to 100 records
