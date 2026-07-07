@@ -38,11 +38,11 @@ module.exports = async function handler(req, res) {
 Technology description: "${description}"
 
 Rules:
-1. Extract 2-4 key technical terms that capture the core inventive concept. Drop generic words (process, method, system, apparatus).
-2. Always include "ta=CO2" unless CO2 is already implicit in a very specific term (e.g. "electrolysis" alone is too broad without CO2).
-3. Join terms with AND. Use OR only for clear synonyms (e.g. ta=methanol OR ta=methyl-alcohol).
+1. Extract exactly 2 key technical terms that capture the core inventive concept. Drop generic words (process, method, system, apparatus, catalyst, synthesis, reaction).
+2. Always include "ta=CO2" as one of the 2 terms unless CO2 is already part of the other term.
+3. Pick only the SINGLE most specific technical term (e.g. "methanol" not "methanol AND copper").
 4. Use EPO ta= (title/abstract) field prefix for each term.
-5. Keep it concise — 2 to 4 ta= clauses.
+5. IMPORTANT: Maximum 2 ta= clauses total. Fewer terms = more results = better landscape coverage.
 
 Return ONLY a JSON object with these fields:
 {

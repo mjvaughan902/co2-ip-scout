@@ -159,6 +159,8 @@ async function fetchEPO(url, accessToken) {
   const res = await fetch(url, {
     headers: { 'Authorization': `Bearer ${accessToken}`, 'Accept': 'application/json' }
   });
+  // 404 = no results found — EPO OPS returns 404 for zero-result queries, not an error
+  if (res.status === 404) return null;
   if (!res.ok) {
     const body = await res.text().catch(() => '');
     const err = new Error(`EPO HTTP ${res.status}`);
@@ -199,9 +201,21 @@ module.exports = async function handler(req, res) {
   const base = `https://ops.epo.org/3.2/rest-services/published-data/search/biblio`;
 
   // Primary fetch: relevance-sorted, up to 100 records
+  // If query is too specific (NL-generated with 3+ terms) and returns 0 results,
+  // automatically fall back to the first 2 ta= terms only.
   let relevanceData;
+  let effectiveQuery = baseQuery;
   try {
     relevanceData = await fetchEPO(`${base}?q=${encodeURIComponent(baseQuery)}&Range=1-100`, accessToken);
+
+    if (!relevanceData && isPrebuiltCQL) {
+      // Broaden: keep only the first 2 ta= clauses
+      const taTerms = baseQuery.match(/ta=[^\s)]+/g) || [];
+      if (taTerms.length > 2) {
+        effectiveQuery = taTerms.slice(0, 2).map(t => t).join(' AND ');
+        relevanceData = await fetchEPO(`${base}?q=${encodeURIComponent(effectiveQuery)}&Range=1-100`, accessToken);
+      }
+    }
   } catch (err) {
     return res.status(200).json({
       error: 'EPO request failed',
@@ -255,7 +269,8 @@ module.exports = async function handler(req, res) {
 
     return res.status(200).json({
       total_results: effectiveTotal,
-      query_used: baseQuery,
+      query_used: effectiveQuery,
+      query_original: effectiveQuery !== baseQuery ? baseQuery : undefined,
       patents: allPatents,               // full combined set for display
       top_assignees: topAssignees,
       year_distribution: yearDist,
