@@ -587,7 +587,7 @@ async function runSearch() {
   try {
     const epoRes = await fetch(API.search, {
       method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ cpc_codes: cpcCodes, keywords: epoKeywords, jurisdictions: selectedJurisdictions })
+      body: JSON.stringify({ cpc_codes: cpcCodes, keywords: epoKeywords, jurisdictions: selectedJurisdictions, original_query: query })
     });
     if (epoRes.ok) {
       epoData = await epoRes.json();

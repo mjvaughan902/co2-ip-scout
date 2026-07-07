@@ -171,6 +171,46 @@ async function fetchEPO(url, accessToken) {
   return res.json();
 }
 
+async function filterPatentsByRelevance(patents, originalQuery, apiKey) {
+  if (!apiKey || !originalQuery || patents.length <= 8) return patents;
+
+  const patentList = patents.map((p, i) =>
+    `${i}. "${p.title}" — ${p.assignee} (${p.year || '?'}): ${(p.abstract || '').slice(0, 150)}`
+  ).join('\n');
+
+  const prompt = `User is searching for patents about: "${originalQuery}"
+
+Rate each patent 0-3 for relevance to exactly that technology:
+3 = directly relevant (same chemistry, mechanism, or application area)
+2 = relevant (related chemistry or closely enabling technology)
+1 = tangential (CO2 chemistry but unrelated application)
+0 = not relevant
+
+Patents:
+${patentList}
+
+Return ONLY a JSON array of integers, one per patent, e.g. [3,1,0,2,3]`;
+
+  try {
+    const r = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'x-api-key': apiKey, 'anthropic-version': '2023-06-01', 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model: 'claude-haiku-4-5-20251001', max_tokens: 300, messages: [{ role: 'user', content: prompt }] })
+    });
+    if (!r.ok) return patents;
+    const data = await r.json();
+    const raw = data.content?.[0]?.text || '';
+    const match = raw.match(/\[[\d,\s]+\]/);
+    if (!match) return patents;
+    const scores = JSON.parse(match[0]);
+    if (scores.length !== patents.length) return patents;
+    const filtered = patents.filter((_, i) => (scores[i] || 0) >= 2);
+    return filtered.length >= 3 ? filtered : patents;
+  } catch {
+    return patents;
+  }
+}
+
 module.exports = async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
@@ -252,9 +292,14 @@ module.exports = async function handler(req, res) {
 
     const effectiveTotal = Math.max(totalCount, allPatents.length);
 
+    // AI relevance filter — removes off-topic results before analysis
+    const { original_query } = req.body || {};
+    const anthropicKey = process.env.ANTHROPIC_API_KEY;
+    const filteredPatents = await filterPatentsByRelevance(allPatents, original_query, anthropicKey);
+
     // Aggregate assignees across full combined set
     const assigneeMap = {};
-    allPatents.forEach(p => {
+    filteredPatents.forEach(p => {
       if (p.assignee && p.assignee !== 'Unknown') {
         assigneeMap[p.assignee] = (assigneeMap[p.assignee] || 0) + 1;
       }
@@ -265,16 +310,17 @@ module.exports = async function handler(req, res) {
       .map(([name, count]) => ({ name, count }));
 
     const yearDist = {};
-    allPatents.forEach(p => { if (p.year) yearDist[p.year] = (yearDist[p.year] || 0) + 1; });
+    filteredPatents.forEach(p => { if (p.year) yearDist[p.year] = (yearDist[p.year] || 0) + 1; });
 
     return res.status(200).json({
       total_results: effectiveTotal,
       query_used: effectiveQuery,
       query_original: effectiveQuery !== baseQuery ? baseQuery : undefined,
-      patents: allPatents,               // full combined set for display
+      patents: filteredPatents,
       top_assignees: topAssignees,
       year_distribution: yearDist,
-      retrieved: allPatents.length,
+      retrieved: filteredPatents.length,
+      pre_filter_count: allPatents.length,
       relevance_count: relevancePatents.length,
       recent_count: recentPatents.length,
     });
