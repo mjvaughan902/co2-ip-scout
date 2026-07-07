@@ -159,7 +159,13 @@ async function fetchEPO(url, accessToken) {
   const res = await fetch(url, {
     headers: { 'Authorization': `Bearer ${accessToken}`, 'Accept': 'application/json' }
   });
-  if (!res.ok) return null;
+  if (!res.ok) {
+    const body = await res.text().catch(() => '');
+    const err = new Error(`EPO HTTP ${res.status}`);
+    err.status = res.status;
+    err.body = body.slice(0, 300);
+    throw err;
+  }
   return res.json();
 }
 
@@ -197,11 +203,15 @@ module.exports = async function handler(req, res) {
   try {
     relevanceData = await fetchEPO(`${base}?q=${encodeURIComponent(baseQuery)}&Range=1-100`, accessToken);
   } catch (err) {
-    return res.status(200).json({ error: 'EPO request failed', detail: err.message, total_results: 0, patents: [] });
-  }
-
-  if (!relevanceData) {
-    return res.status(200).json({ error: 'EPO search returned no data', total_results: 0, patents: [], query_used: baseQuery });
+    return res.status(200).json({
+      error: 'EPO request failed',
+      detail: err.message,
+      epo_status: err.status || null,
+      epo_body: err.body || null,
+      query_used: baseQuery,
+      total_results: 0,
+      patents: []
+    });
   }
 
   // Secondary fetch: recent filings only — runs only if primary succeeded, failures are non-fatal

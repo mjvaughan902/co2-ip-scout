@@ -508,8 +508,10 @@ async function runSearch() {
         badge.textContent=`Live EPO · ${epoTotal.toLocaleString()} patents${recStr}`;
       } else if (epoData.error) {
         badge.className='data-badge db-ai';
-        badge.textContent=`EPO unavailable — AI estimates only`;
-        console.warn('EPO error:', epoData.error, epoData.detail||'');
+        const statusHint = epoData.epo_status ? ` (HTTP ${epoData.epo_status})` : '';
+        badge.textContent=`EPO unavailable${statusHint} — AI estimates only`;
+        badge.title = [epoData.error, epoData.detail, epoData.epo_body].filter(Boolean).join(' | ');
+        console.warn('EPO error:', epoData.error, epoData.detail||'', epoData.epo_body||'', 'Query was:', epoData.query_used||'');
       }
       // Update query hint with what EPO actually used
       if (epoData.query_used) {
