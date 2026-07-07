@@ -245,6 +245,55 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 .save-in:focus { outline: none; border-color: #1D9E75; }
 .err { background: #fef0ee; border: 1px solid #f5c9c0; border-radius: 8px; padding: 11px 14px; color: #993C1D; font-size: 13px; }
 .pj-empty { text-align: center; padding: 2.5rem; color: #bbb; font-size: 13px; }
+
+/* Patent Check panel */
+.pat-mode-toggle { display: flex; gap: 6px; margin-bottom: 0.5rem; }
+.pat-mode-btn { padding: 7px 14px; font-size: 12px; border: 1px solid #d0cec8; border-radius: 7px; cursor: pointer; color: #666; background: #fff; font-family: inherit; font-weight: 500; }
+.pat-mode-btn.active { border-color: #1D9E75; background: #eaf8f2; color: #0F6E56; font-weight: 600; }
+.pat-mode-btn:hover:not(.active) { background: #f0eeea; }
+.pat-status-bar { margin: 0.75rem 0; padding: 8px 12px; background: #f7f7f5; border-radius: 7px; border: 1px solid #e4e2dc; font-size: 12px; color: #888; display: flex; align-items: center; gap: 8px; }
+.grant-wrap { margin-bottom: 1.2rem; }
+.grant-bar-bg { height: 12px; background: #f0eeea; border-radius: 6px; overflow: hidden; margin: 8px 0 4px; }
+.grant-bar-fill { height: 12px; border-radius: 6px; transition: width 0.8s ease; }
+.grant-row { display: flex; align-items: center; justify-content: space-between; }
+.grant-pct { font-size: 28px; font-weight: 700; line-height: 1; }
+.grant-lbl { font-size: 12px; color: #888; }
+.grant-sub { font-size: 12px; color: #666; line-height: 1.7; margin-top: 6px; }
+.r-card { background: #fff; border: 1px solid #e4e2dc; border-radius: 10px; padding: 12px 14px; margin-bottom: 8px; }
+.r-hdr { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
+.r-title { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.07em; color: #aaa; }
+.r-badge { font-size: 10px; padding: 2px 9px; border-radius: 20px; font-weight: 600; }
+.rb-high { background: #eaf8f2; color: #0F6E56; }
+.rb-med  { background: #fdf1dc; color: #854F0B; }
+.rb-low  { background: #fef0ee; color: #993C1D; }
+.r-body { font-size: 12px; color: #555; line-height: 1.75; }
+.pa-card { background: #fff; border: 1px solid #e4e2dc; border-radius: 8px; padding: 10px 12px; margin-bottom: 7px; display: flex; align-items: flex-start; gap: 10px; }
+.pa-overlap { width: 4px; border-radius: 2px; flex-shrink: 0; align-self: stretch; min-height: 40px; }
+.pa-oh { background: #D85A30; }
+.pa-om { background: #FAC775; }
+.pa-ol { background: #d0cec8; }
+.pa-body { flex: 1; min-width: 0; }
+.pa-ttl { font-size: 12px; font-weight: 600; color: #222; margin-bottom: 3px; line-height: 1.45; }
+.pa-meta { font-size: 10px; color: #bbb; display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 3px; }
+.pa-reason { font-size: 11px; color: #888; line-height: 1.55; }
+.rec-card { background: #fff; border: 1px solid #e4e2dc; border-left: 3px solid #1D9E75; border-radius: 0 8px 8px 0; padding: 9px 12px; margin-bottom: 7px; display: flex; align-items: flex-start; gap: 9px; }
+.rec-type { font-size: 10px; padding: 2px 8px; border-radius: 20px; font-weight: 600; white-space: nowrap; margin-top: 1px; flex-shrink: 0; }
+.rt-broaden { background: #eaf8f2; color: #0F6E56; }
+.rt-narrow   { background: #fdf1dc; color: #854F0B; }
+.rt-differentiate { background: #e8f0fb; color: #185FA5; }
+.rt-add { background: #f0eeea; color: #666; }
+.rec-text { font-size: 12px; color: #444; line-height: 1.65; }
+.ws-pat-card { background: #fff; border: 1px solid #e4e2dc; border-left: 4px solid #1D9E75; border-radius: 0 8px 8px 0; padding: 10px 13px; margin-bottom: 7px; }
+.ws-pat-card.med { border-left-color: #7ecbb5; }
+.ws-pat-card.low { border-left-color: #d0cec8; }
+.ws-pat-ttl { font-size: 12px; font-weight: 600; color: #222; margin-bottom: 4px; display: flex; align-items: center; gap: 7px; flex-wrap: wrap; }
+.ws-pat-body { font-size: 11px; color: #888; line-height: 1.65; }
+.disclaimer-box { margin-top: 1.2rem; padding: 10px 13px; background: #fdf8f0; border: 1px solid #f0d49a; border-radius: 8px; font-size: 11px; color: #854F0B; line-height: 1.7; }
+.key-claims { display: flex; flex-wrap: wrap; gap: 5px; margin: 8px 0; }
+.key-claim { font-size: 11px; padding: 3px 9px; background: #f0eeea; border: 1px solid #e0deda; border-radius: 20px; color: #666; }
+.pat-meta-bar { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 1rem; align-items: center; }
+.pat-meta-item { font-size: 11px; color: #888; display: flex; align-items: center; gap: 4px; }
+.pat-meta-sep { color: #d0cec8; }
 </style>
 </head>
 <body>
@@ -266,6 +315,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
   <nav class="main-nav">
     <button class="nav-tab active" id="nav-analyse"  onclick="switchNav('analyse')">🔬 Analyse</button>
     <button class="nav-tab"        id="nav-compare"  onclick="switchNav('compare')">⚖ Compare</button>
+    <button class="nav-tab"        id="nav-patent"   onclick="switchNav('patent')">📋 Patent Check</button>
     <button class="nav-tab"        id="nav-projects" onclick="switchNav('projects')">📁 Projects <span class="nav-badge" id="projBadge"></span></button>
   </nav>
 
@@ -333,6 +383,49 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
     </div>
   </div>
 
+  <!-- PATENT CHECK -->
+  <div class="panel" id="panel-patent">
+    <div style="margin-bottom:1.2rem;">
+      <div style="font-size:16px;font-weight:700;color:#111;margin-bottom:3px;">Patent Check — Mode A</div>
+      <div style="font-size:12px;color:#bbb;line-height:1.6;">Evaluate inventiveness, novelty, and likelihood of grant for an existing patent or a draft invention.</div>
+    </div>
+
+    <div class="slbl">Input type</div>
+    <div class="pat-mode-toggle">
+      <button class="pat-mode-btn active" id="pat-mode-num" onclick="setPatMode('number')">📄 Patent number</button>
+      <button class="pat-mode-btn"        id="pat-mode-txt" onclick="setPatMode('text')">✏ Draft claims / idea</button>
+    </div>
+
+    <div id="patNumSection" style="margin-top:1rem;">
+      <div class="slbl">Patent or application number</div>
+      <div class="srow" style="margin-bottom:5px;">
+        <input class="sinput" id="patNumIn" type="text" placeholder="e.g. EP3456789  ·  WO2021123456  ·  US10234567" />
+        <button class="btn-p" id="patBtn" onclick="runPatentCheck()">🔬 Analyse</button>
+      </div>
+      <div style="font-size:11px;color:#bbb;margin-bottom:1rem;">Supports EP, WO, US, CN, JP, KR numbers. Claims and abstract are retrieved directly from EPO.</div>
+    </div>
+
+    <div id="patTxtSection" style="display:none;margin-top:1rem;">
+      <div class="slbl">Title (optional)</div>
+      <input class="sinput" id="patTitleIn" type="text" style="margin-bottom:0.75rem;" placeholder="e.g. Novel catalyst for CO₂ electroreduction to ethylene" />
+      <div class="slbl">Claims or invention description</div>
+      <textarea class="sinput" id="patTextIn" rows="7" style="resize:vertical;font-size:13px;line-height:1.65;margin-bottom:0.75rem;" placeholder="Paste draft claims, or describe your invention in plain language.&#10;&#10;Example: 'A method for electrochemical reduction of CO₂ to ethylene using a copper catalyst with sub-2nm grain size, comprising...'&#10;&#10;Or just describe the key innovation — the AI will identify the key technical elements."></textarea>
+      <button class="btn-p" id="patBtnTxt" onclick="runPatentCheck()">🔬 Analyse</button>
+    </div>
+
+    <div id="patStatus" style="display:none;" class="pat-status-bar">
+      <span class="spin" style="display:inline-block;"></span>
+      <span id="patStatusMsg">Initialising…</span>
+    </div>
+
+    <div id="patResults" style="margin-top:1.2rem;">
+      <div class="empty" style="padding:2.5rem 1rem;">
+        <div class="empty-ic">📋</div>
+        <p>Enter a patent number or paste draft claims<br>to evaluate inventiveness and likelihood of grant.</p>
+      </div>
+    </div>
+  </div>
+
   <!-- PROJECTS -->
   <div class="panel" id="panel-projects">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;">
@@ -353,7 +446,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 // ── Config ───────────────────────────────────────────────────────────────────
 // In production these calls go to /api/* (same-origin Vercel functions).
 // For local dev with `vercel dev` this also works out of the box.
-const API = { search: '/api/epo-search', analyse: '/api/ai-analyse', stream: '/api/ai-stream', nlQuery: '/api/nl-to-query' };
+const API = { search: '/api/epo-search', analyse: '/api/ai-analyse', stream: '/api/ai-stream', nlQuery: '/api/nl-to-query', patentAnalyse: '/api/patent-analyse' };
 
 // ── Chemistry families ────────────────────────────────────────────────────────
 const FAMILIES = [
@@ -400,7 +493,7 @@ function saveProjectsLocal() {
 
 // ── Nav ───────────────────────────────────────────────────────────────────────
 function switchNav(tab) {
-  ['analyse','compare','projects'].forEach(t => {
+  ['analyse','compare','patent','projects'].forEach(t => {
     document.getElementById('panel-'+t).classList.toggle('active', t===tab);
     document.getElementById('nav-'+t).classList.toggle('active', t===tab);
   });
@@ -1109,6 +1202,198 @@ async function submitAskAI() {
   }
   btn.disabled = false;
   btn.innerHTML = 'Ask';
+}
+
+// ── Patent Check ─────────────────────────────────────────────────────────────
+let _patMode = 'number';
+function setPatMode(mode) {
+  _patMode = mode;
+  document.getElementById('pat-mode-num').classList.toggle('active', mode === 'number');
+  document.getElementById('pat-mode-txt').classList.toggle('active', mode === 'text');
+  document.getElementById('patNumSection').style.display = mode === 'number' ? '' : 'none';
+  document.getElementById('patTxtSection').style.display = mode === 'text'   ? '' : 'none';
+}
+
+function setPatStatus(msg) {
+  const bar = document.getElementById('patStatus');
+  if (!msg) { bar.style.display = 'none'; return; }
+  bar.style.display = 'flex';
+  document.getElementById('patStatusMsg').textContent = msg;
+}
+
+async function runPatentCheck() {
+  const btn = document.getElementById(_patMode === 'number' ? 'patBtn' : 'patBtnTxt');
+  const patNum   = document.getElementById('patNumIn')?.value.trim();
+  const claimTxt = document.getElementById('patTextIn')?.value.trim();
+  const inTitle  = document.getElementById('patTitleIn')?.value.trim();
+
+  if (_patMode === 'number' && !patNum)   { alert('Please enter a patent number.'); return; }
+  if (_patMode === 'text'   && !claimTxt) { alert('Please paste claims or describe your invention.'); return; }
+
+  btn.disabled = true;
+  setPatStatus('Connecting…');
+  document.getElementById('patResults').innerHTML = '';
+
+  const body = _patMode === 'number'
+    ? { patent_number: patNum }
+    : { claim_text: claimTxt, input_title: inTitle || undefined };
+
+  try {
+    const res = await fetch(API.patentAnalyse, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+    const reader  = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+    let metaData = null;
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop();
+      for (const line of lines) {
+        if (!line.startsWith('data:')) continue;
+        try {
+          const ev = JSON.parse(line.slice(5).trim());
+          if (ev.type === 'status') {
+            setPatStatus(ev.message);
+          } else if (ev.type === 'meta') {
+            metaData = ev.data;
+          } else if (ev.type === 'complete') {
+            setPatStatus(null);
+            renderPatentResults(ev.data, metaData);
+          } else if (ev.type === 'error') {
+            setPatStatus(null);
+            document.getElementById('patResults').innerHTML =
+              `<div class="err">Analysis failed: ${ev.message}</div>`;
+          }
+        } catch {}
+      }
+    }
+  } catch(e) {
+    setPatStatus(null);
+    document.getElementById('patResults').innerHTML = `<div class="err">Error: ${e.message}</div>`;
+  }
+  btn.disabled = false;
+}
+
+function renderPatentResults(d, meta) {
+  const el = document.getElementById('patResults');
+  if (!d) { el.innerHTML = '<div class="err">No results returned.</div>'; return; }
+
+  const pct = Math.max(0, Math.min(100, d.likelihood_of_grant || 0));
+  const grantColour = pct >= 70 ? '#1D9E75' : pct >= 40 ? '#FAC775' : '#D85A30';
+  const grantLabel  = pct >= 70 ? 'Good likelihood of grant' : pct >= 40 ? 'Moderate likelihood of grant' : 'Low likelihood of grant';
+
+  const ratingBadge = r => {
+    const c = r === 'high' ? 'rb-high' : r === 'medium' ? 'rb-med' : 'rb-low';
+    return `<span class="r-badge ${c}">${r || '—'}</span>`;
+  };
+
+  const docTypeLbl = d.document_type === 'existing_patent' ? '📄 Existing patent'
+    : d.document_type === 'draft_claims' ? '✏ Draft claims'
+    : '💡 Idea summary';
+
+  // Meta bar
+  const metaItems = [
+    docTypeLbl,
+    meta?.patent_number ? `<strong>${meta.patent_number}</strong>` : '',
+    (meta?.title || d.title) ? (meta?.title || d.title) : '',
+    meta?.assignee ? `${meta.assignee}` : '',
+    meta?.year ? `${meta.year}` : '',
+    d.prior_art_count != null ? `${d.prior_art_count.toLocaleString()} prior art matches` : ''
+  ].filter(Boolean);
+
+  // Key claim elements
+  const claimEls = (d.key_claim_elements || []).map(c => `<span class="key-claim">${c}</span>`).join('');
+
+  // Whitespace
+  const wsHtml = (d.whitespace_aspects || []).map(w => {
+    const cls = w.strength === 'high' ? '' : w.strength === 'medium' ? ' med' : ' low';
+    const badge = w.strength === 'high' ? '<span class="ws-strength ws-sh">High</span>'
+      : w.strength === 'medium' ? '<span class="ws-strength ws-sm">Medium</span>'
+      : '<span class="ws-strength ws-sl">Low</span>';
+    return `<div class="ws-pat-card${cls}">
+      <div class="ws-pat-ttl">${w.aspect} ${badge}</div>
+      <div class="ws-pat-body">${w.description}</div>
+    </div>`;
+  }).join('');
+
+  // Blocking prior art
+  const paHtml = (d.blocking_prior_art || []).map(p => {
+    const oc = p.overlap === 'high' ? 'pa-oh' : p.overlap === 'medium' ? 'pa-om' : 'pa-ol';
+    return `<div class="pa-card">
+      <div class="pa-overlap ${oc}"></div>
+      <div class="pa-body">
+        <div class="pa-ttl">${p.title || 'Untitled'}</div>
+        <div class="pa-meta">
+          ${p.number ? `<span>${p.number}</span>` : ''}
+          ${p.assignee ? `<span>${p.assignee}</span>` : ''}
+          ${p.year ? `<span>${p.year}</span>` : ''}
+          <span class="r-badge ${p.overlap === 'high' ? 'rb-low' : p.overlap === 'medium' ? 'rb-med' : 'rb-high'}">${p.overlap || '—'} overlap</span>
+        </div>
+        ${p.reason ? `<div class="pa-reason">${p.reason}</div>` : ''}
+      </div>
+    </div>`;
+  }).join('');
+
+  // Recommendations
+  const recHtml = (d.claim_recommendations || []).map(r => {
+    const tc = r.type === 'broaden' ? 'rt-broaden' : r.type === 'narrow' ? 'rt-narrow'
+      : r.type === 'differentiate' ? 'rt-differentiate' : 'rt-add';
+    return `<div class="rec-card">
+      <span class="rec-type ${tc}">${r.type}</span>
+      <span class="rec-text">${r.recommendation}</span>
+    </div>`;
+  }).join('');
+
+  el.innerHTML = `
+    <div class="pat-meta-bar">
+      ${metaItems.map((v, i) => (i > 0 ? '<span class="pat-meta-sep">·</span>' : '') + `<span class="pat-meta-item">${v}</span>`).join('')}
+    </div>
+
+    ${claimEls ? `<div class="rblock"><div class="shdr">Key elements identified</div><div class="key-claims">${claimEls}</div></div>` : ''}
+
+    <div class="rblock">
+      <div class="shdr">Likelihood of grant</div>
+      <div class="card grant-wrap">
+        <div class="grant-row">
+          <span class="grant-pct" style="color:${grantColour}">${pct}%</span>
+          <span class="grant-lbl">${grantLabel}</span>
+        </div>
+        <div class="grant-bar-bg"><div class="grant-bar-fill" style="width:${pct}%;background:${grantColour}"></div></div>
+        ${d.likelihood_assessment ? `<div class="grant-sub">${d.likelihood_assessment}</div>` : ''}
+      </div>
+    </div>
+
+    <div class="rblock">
+      <div class="shdr">Novelty &amp; inventive step</div>
+      <div class="r-card">
+        <div class="r-hdr"><span class="r-title">Novelty</span>${ratingBadge(d.novelty_rating)}</div>
+        <div class="r-body">${d.novelty_assessment || ''}</div>
+      </div>
+      <div class="r-card">
+        <div class="r-hdr"><span class="r-title">Inventive step</span>${ratingBadge(d.inventive_step_rating)}</div>
+        <div class="r-body">${d.inventive_step_assessment || ''}</div>
+      </div>
+    </div>
+
+    ${wsHtml ? `<div class="rblock"><div class="shdr">Whitespace opportunities within this claim space</div>${wsHtml}</div>` : ''}
+
+    ${paHtml ? `<div class="rblock"><div class="shdr">Blocking prior art (${(d.blocking_prior_art||[]).length} identified)</div>${paHtml}</div>` : ''}
+
+    ${recHtml ? `<div class="rblock"><div class="shdr">Claim drafting recommendations</div>${recHtml}</div>` : ''}
+
+    ${d.strategic_summary ? `<div class="strat"><div class="strat-lbl">Strategic summary</div><div class="strat-txt">${d.strategic_summary}</div></div>` : ''}
+
+    ${d.disclaimer ? `<div class="disclaimer-box">⚠ ${d.disclaimer}</div>` : ''}
+  `;
 }
 
 // ── Init ──────────────────────────────────────────────────────────────────────

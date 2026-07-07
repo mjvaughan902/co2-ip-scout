@@ -11,6 +11,9 @@
     },
     "api/nl-to-query.js": {
       "maxDuration": 15
+    },
+    "api/patent-analyse.js": {
+      "maxDuration": 60
     }
   }
 }
