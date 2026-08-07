@@ -251,7 +251,12 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 .pat-mode-btn { padding: 7px 14px; font-size: 12px; border: 1px solid #d0cec8; border-radius: 7px; cursor: pointer; color: #666; background: #fff; font-family: inherit; font-weight: 500; }
 .pat-mode-btn.active { border-color: #1D9E75; background: #eaf8f2; color: #0F6E56; font-weight: 600; }
 .pat-mode-btn:hover:not(.active) { background: #f0eeea; }
-.pat-status-bar { margin: 0.75rem 0; padding: 8px 12px; background: #f7f7f5; border-radius: 7px; border: 1px solid #e4e2dc; font-size: 12px; color: #888; display: flex; align-items: center; gap: 8px; }
+.pat-progress-wrap { margin: 1rem 0; display: none; }
+.pat-progress-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
+.pat-progress-msg { font-size: 12px; color: #555; }
+.pat-progress-pct { font-size: 12px; font-weight: 600; color: #1D9E75; }
+.pat-progress-track { height: 6px; background: #e4e2dc; border-radius: 3px; overflow: hidden; }
+.pat-progress-fill { height: 6px; background: #1D9E75; border-radius: 3px; width: 0%; transition: width 0.6s ease; }
 .grant-wrap { margin-bottom: 1.2rem; }
 .grant-bar-bg { height: 12px; background: #f0eeea; border-radius: 6px; overflow: hidden; margin: 8px 0 4px; }
 .grant-bar-fill { height: 12px; border-radius: 6px; transition: width 0.8s ease; }
@@ -413,9 +418,14 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
       <button class="btn-p" id="patBtnTxt" onclick="runPatentCheck()">🔬 Analyse</button>
     </div>
 
-    <div id="patStatus" style="display:none;" class="pat-status-bar">
-      <span class="spin" style="display:inline-block;"></span>
-      <span id="patStatusMsg">Initialising…</span>
+    <div id="patProgressWrap" class="pat-progress-wrap">
+      <div class="pat-progress-top">
+        <span id="patStatusMsg" class="pat-progress-msg">Initialising…</span>
+        <span id="patProgressPct" class="pat-progress-pct">0%</span>
+      </div>
+      <div class="pat-progress-track">
+        <div id="patProgressFill" class="pat-progress-fill"></div>
+      </div>
     </div>
 
     <div id="patResults" style="margin-top:1.2rem;">
@@ -1214,11 +1224,59 @@ function setPatMode(mode) {
   document.getElementById('patTxtSection').style.display = mode === 'text'   ? '' : 'none';
 }
 
+// Progress milestones: message fragment → target percentage
+const PAT_MILESTONES = [
+  ['Connecting',         5],
+  ['Fetching patent',   20],
+  ['EPO fetch',         20],
+  ['Searching EPO',     45],
+  ['prior art',         45],
+  ['Generating',        55],  // Claude starts here — crawl begins
+  ['inventiveness',     55],
+];
+let _patProgressInterval = null;
+let _patProgressCurrent  = 0;
+
+function setPatProgress(pct) {
+  _patProgressCurrent = pct;
+  const fill = document.getElementById('patProgressFill');
+  const label = document.getElementById('patProgressPct');
+  if (fill)  fill.style.width = Math.min(100, pct) + '%';
+  if (label) label.textContent = Math.round(Math.min(100, pct)) + '%';
+}
+
+function startPatCrawl() {
+  if (_patProgressInterval) clearInterval(_patProgressInterval);
+  _patProgressInterval = setInterval(() => {
+    // Decelerate toward 93% — never reaches it until complete event fires
+    const gap = 93 - _patProgressCurrent;
+    if (gap > 0.2) setPatProgress(_patProgressCurrent + gap * 0.04);
+  }, 600);
+}
+
+function stopPatCrawl() {
+  if (_patProgressInterval) { clearInterval(_patProgressInterval); _patProgressInterval = null; }
+}
+
 function setPatStatus(msg) {
-  const bar = document.getElementById('patStatus');
-  if (!msg) { bar.style.display = 'none'; return; }
-  bar.style.display = 'flex';
-  document.getElementById('patStatusMsg').textContent = msg;
+  const wrap = document.getElementById('patProgressWrap');
+  if (!msg) {
+    stopPatCrawl();
+    if (wrap) wrap.style.display = 'none';
+    return;
+  }
+  if (wrap) wrap.style.display = 'block';
+  const msgEl = document.getElementById('patStatusMsg');
+  if (msgEl) msgEl.textContent = msg;
+
+  // Jump to milestone percentage for this message
+  const milestone = PAT_MILESTONES.find(([fragment]) => msg.toLowerCase().includes(fragment.toLowerCase()));
+  if (milestone) {
+    stopPatCrawl();
+    setPatProgress(milestone[1]);
+    // Start slow crawl once Claude thinking begins
+    if (milestone[1] >= 55) startPatCrawl();
+  }
 }
 
 async function runPatentCheck() {
@@ -1231,6 +1289,8 @@ async function runPatentCheck() {
   if (_patMode === 'text'   && !claimTxt) { alert('Please paste claims or describe your invention.'); return; }
 
   btn.disabled = true;
+  _patProgressCurrent = 0;
+  setPatProgress(0);
   setPatStatus('Connecting…');
   document.getElementById('patResults').innerHTML = '';
 
@@ -1266,7 +1326,9 @@ async function runPatentCheck() {
           } else if (ev.type === 'meta') {
             metaData = ev.data;
           } else if (ev.type === 'complete') {
-            setPatStatus(null);
+            stopPatCrawl();
+            setPatProgress(100);
+            setTimeout(() => setPatStatus(null), 400);
             renderPatentResults(ev.data, metaData);
           } else if (ev.type === 'error') {
             setPatStatus(null);

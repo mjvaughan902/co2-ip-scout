@@ -259,10 +259,12 @@ Return ONLY a valid JSON object, no markdown:
   "disclaimer": "Preliminary AI screening only — not legal advice. Consult a qualified patent attorney before filing or commercialisation decisions."
 }`;
 
+    // Non-streaming Claude call — the response is JSON, streaming deltas give no UX benefit.
+    // Progress feedback comes from the status events emitted above.
     const response = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: { 'x-api-key': anthropicKey, 'anthropic-version': '2023-06-01', 'Content-Type': 'application/json' },
-      body: JSON.stringify({ model: 'claude-sonnet-4-6', max_tokens: 3000, stream: true, system: systemPrompt, messages: [{ role: 'user', content: userPrompt }] })
+      body: JSON.stringify({ model: 'claude-sonnet-4-6', max_tokens: 3000, system: systemPrompt, messages: [{ role: 'user', content: userPrompt }] })
     });
 
     if (!response.ok) {
@@ -271,40 +273,9 @@ Return ONLY a valid JSON object, no markdown:
       res.end(); return;
     }
 
-    let fullText = '';
-    let lineBuffer = '';
-    try {
-      for await (const chunk of response.body) {
-        lineBuffer += Buffer.isBuffer(chunk) ? chunk.toString() : chunk;
-        const lines = lineBuffer.split('\n');
-        lineBuffer = lines.pop() || '';
-        for (const line of lines) {
-          if (!line.startsWith('data:')) continue;
-          const d = line.slice(5).trim();
-          if (d === '[DONE]') continue;
-          try {
-            const ev = JSON.parse(d);
-            if (ev.type === 'content_block_delta' && ev.delta?.text) {
-              fullText += ev.delta.text;
-              emit({ type: 'delta', text: ev.delta.text });
-            }
-          } catch {}
-        }
-      }
-      // flush any remaining buffer
-      if (lineBuffer.startsWith('data:')) {
-        const d = lineBuffer.slice(5).trim();
-        try {
-          const ev = JSON.parse(d);
-          if (ev.type === 'content_block_delta' && ev.delta?.text) fullText += ev.delta.text;
-        } catch {}
-      }
-    } catch (streamErr) {
-      emit({ type: 'error', message: `Stream error: ${streamErr.message}` });
-      res.end(); return;
-    }
-
-    const cleaned = fullText.replace(/```json|```/g, '').trim();
+    const aiData = await response.json();
+    const raw = aiData.content?.[0]?.text || '';
+    const cleaned = raw.replace(/```json|```/g, '').trim();
     const tryParse = s => { try { return JSON.parse(s); } catch { return null; } };
     const parsed = tryParse(cleaned) || tryParse((cleaned.match(/\{[\s\S]*\}/) || [])[0]);
     if (parsed) { emit({ type: 'complete', data: parsed }); }
