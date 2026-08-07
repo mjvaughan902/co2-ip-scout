@@ -272,31 +272,44 @@ Return ONLY a valid JSON object, no markdown:
     }
 
     let fullText = '';
-    response.body.on('data', chunk => {
-      for (const line of chunk.toString().split('\n')) {
-        if (!line.startsWith('data:')) continue;
-        const d = line.slice(5).trim();
-        if (d === '[DONE]') return;
+    let lineBuffer = '';
+    try {
+      for await (const chunk of response.body) {
+        lineBuffer += Buffer.isBuffer(chunk) ? chunk.toString() : chunk;
+        const lines = lineBuffer.split('\n');
+        lineBuffer = lines.pop() || '';
+        for (const line of lines) {
+          if (!line.startsWith('data:')) continue;
+          const d = line.slice(5).trim();
+          if (d === '[DONE]') continue;
+          try {
+            const ev = JSON.parse(d);
+            if (ev.type === 'content_block_delta' && ev.delta?.text) {
+              fullText += ev.delta.text;
+              emit({ type: 'delta', text: ev.delta.text });
+            }
+          } catch {}
+        }
+      }
+      // flush any remaining buffer
+      if (lineBuffer.startsWith('data:')) {
+        const d = lineBuffer.slice(5).trim();
         try {
           const ev = JSON.parse(d);
-          if (ev.type === 'content_block_delta' && ev.delta?.text) {
-            fullText += ev.delta.text;
-            emit({ type: 'delta', text: ev.delta.text });
-          }
+          if (ev.type === 'content_block_delta' && ev.delta?.text) fullText += ev.delta.text;
         } catch {}
       }
-    });
+    } catch (streamErr) {
+      emit({ type: 'error', message: `Stream error: ${streamErr.message}` });
+      res.end(); return;
+    }
 
-    response.body.on('end', () => {
-      const cleaned = fullText.replace(/```json|```/g, '').trim();
-      const tryParse = s => { try { return JSON.parse(s); } catch { return null; } };
-      const parsed = tryParse(cleaned) || tryParse((cleaned.match(/\{[\s\S]*\}/) || [])[0]);
-      if (parsed) { emit({ type: 'complete', data: parsed }); }
-      else { emit({ type: 'error', message: 'Could not parse analysis — please try again.' }); }
-      res.end();
-    });
-
-    response.body.on('error', err => { emit({ type: 'error', message: err.message }); res.end(); });
+    const cleaned = fullText.replace(/```json|```/g, '').trim();
+    const tryParse = s => { try { return JSON.parse(s); } catch { return null; } };
+    const parsed = tryParse(cleaned) || tryParse((cleaned.match(/\{[\s\S]*\}/) || [])[0]);
+    if (parsed) { emit({ type: 'complete', data: parsed }); }
+    else { emit({ type: 'error', message: 'Could not parse analysis — please try again.' }); }
+    res.end();
 
   } catch (err) {
     emit({ type: 'error', message: err.message });

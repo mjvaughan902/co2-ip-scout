@@ -37,22 +37,31 @@ module.exports = async function handler(req, res) {
         res.end(); return;
       }
       let fullText = '';
-      fRes.body.on('data', chunk => {
-        for (const line of chunk.toString().split('\n')) {
-          if (!line.startsWith('data:')) continue;
-          const data = line.slice(5).trim();
-          if (data === '[DONE]') return;
-          try {
-            const ev = JSON.parse(data);
-            if (ev.type === 'content_block_delta' && ev.delta?.text) {
-              fullText += ev.delta.text;
-              res.write(`data: ${JSON.stringify({ type: 'delta', text: ev.delta.text })}\n\n`);
-            }
-          } catch {}
+      let lineBuf = '';
+      try {
+        for await (const chunk of fRes.body) {
+          lineBuf += Buffer.isBuffer(chunk) ? chunk.toString() : chunk;
+          const lines = lineBuf.split('\n');
+          lineBuf = lines.pop() || '';
+          for (const line of lines) {
+            if (!line.startsWith('data:')) continue;
+            const d = line.slice(5).trim();
+            if (d === '[DONE]') continue;
+            try {
+              const ev = JSON.parse(d);
+              if (ev.type === 'content_block_delta' && ev.delta?.text) {
+                fullText += ev.delta.text;
+                res.write(`data: ${JSON.stringify({ type: 'delta', text: ev.delta.text })}\n\n`);
+              }
+            } catch {}
+          }
         }
-      });
-      fRes.body.on('end', () => { res.write(`data: ${JSON.stringify({ type: 'complete', data: { answer: fullText } })}\n\n`); res.end(); });
-      fRes.body.on('error', err => { res.write(`data: ${JSON.stringify({ type: 'error', message: err.message })}\n\n`); res.end(); });
+      } catch (streamErr) {
+        res.write(`data: ${JSON.stringify({ type: 'error', message: streamErr.message })}\n\n`);
+        res.end(); return;
+      }
+      res.write(`data: ${JSON.stringify({ type: 'complete', data: { answer: fullText } })}\n\n`);
+      res.end();
     } catch(err) {
       res.write(`data: ${JSON.stringify({ type: 'error', message: err.message })}\n\n`);
       res.end();
@@ -207,85 +216,79 @@ Return this JSON with ALL fields populated with real, specific content for this 
     }
 
     let fullText = '';
-
-    response.body.on('data', chunk => {
-      const lines = chunk.toString().split('\n');
-      for (const line of lines) {
-        if (!line.startsWith('data:')) continue;
-        const data = line.slice(5).trim();
-        if (data === '[DONE]') continue;
-        try {
-          const event = JSON.parse(data);
-          if (event.type === 'content_block_delta' && event.delta?.text) {
-            fullText += event.delta.text;
-            res.write(`data: ${JSON.stringify({ type: 'delta', text: event.delta.text })}\n\n`);
-          }
-        } catch(e) { /* skip malformed */ }
-      }
-    });
-
-    response.body.on('end', () => {
-      const cleaned = fullText.replace(/```json|```/g, '').trim();
-
-      // Try direct parse
-      try {
-        const parsed = JSON.parse(cleaned);
-        res.write(`data: ${JSON.stringify({ type: 'complete', data: parsed })}\n\n`);
-        res.end();
-        return;
-      } catch(e) {}
-
-      // Try to find JSON object in response
-      const jsonMatch = cleaned.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        try {
-          const parsed = JSON.parse(jsonMatch[0]);
-          res.write(`data: ${JSON.stringify({ type: 'complete', data: parsed })}\n\n`);
-          res.end();
-          return;
-        } catch(e) {}
-      }
-
-      // Truncation recovery — close at last complete top-level field
-      const opens = (cleaned.match(/\{/g) || []).length;
-      const closes = (cleaned.match(/\}/g) || []).length;
-      if (opens > closes) {
-        // Find last safely-completed section and close there
-        const checkpoints = [
-          '"strategic_recommendation"',
-          '"representative_patents"',
-          '"top_assignees"',
-          '"blocking_risks"',
-          '"whitespace_opportunities"'
-        ];
-        for (const cp of checkpoints) {
-          const idx = cleaned.lastIndexOf(cp);
-          if (idx > 0) {
-            // Find end of this field's value
-            let fixed = cleaned.slice(0, idx);
-            // Close with minimal valid fields
-            const tail = cp === '"strategic_recommendation"'
-              ? `${cp}:"See landscape summary for strategic guidance."}`
-              : `${cp}:[],"strategic_recommendation":"See landscape summary for strategic guidance."}`;
-            try {
-              const parsed = JSON.parse(fixed + tail);
-              parsed.data_source = (parsed.data_source || dataSource) + ' (partial)';
-              res.write(`data: ${JSON.stringify({ type: 'complete', data: parsed })}\n\n`);
-              res.end();
-              return;
-            } catch(e) {}
-          }
+    let lineBuf = '';
+    try {
+      for await (const chunk of response.body) {
+        lineBuf += Buffer.isBuffer(chunk) ? chunk.toString() : chunk;
+        const lines = lineBuf.split('\n');
+        lineBuf = lines.pop() || '';
+        for (const line of lines) {
+          if (!line.startsWith('data:')) continue;
+          const data = line.slice(5).trim();
+          if (data === '[DONE]') continue;
+          try {
+            const event = JSON.parse(data);
+            if (event.type === 'content_block_delta' && event.delta?.text) {
+              fullText += event.delta.text;
+              res.write(`data: ${JSON.stringify({ type: 'delta', text: event.delta.text })}\n\n`);
+            }
+          } catch(e) { /* skip malformed */ }
         }
       }
+    } catch(streamErr) {
+      res.write(`data: ${JSON.stringify({ type: 'error', message: streamErr.message })}\n\n`);
+      res.end(); return;
+    }
 
-      res.write(`data: ${JSON.stringify({ type: 'error', message: 'Could not parse AI response. Please try again.', raw: cleaned.slice(0, 200) })}\n\n`);
-      res.end();
-    });
+    const cleaned = fullText.replace(/```json|```/g, '').trim();
 
-    response.body.on('error', err => {
-      res.write(`data: ${JSON.stringify({ type: 'error', message: err.message })}\n\n`);
-      res.end();
-    });
+    // Try direct parse
+    try {
+      const parsed = JSON.parse(cleaned);
+      res.write(`data: ${JSON.stringify({ type: 'complete', data: parsed })}\n\n`);
+      res.end(); return;
+    } catch(e) {}
+
+    // Try to find JSON object in response
+    const jsonMatch = cleaned.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      try {
+        const parsed = JSON.parse(jsonMatch[0]);
+        res.write(`data: ${JSON.stringify({ type: 'complete', data: parsed })}\n\n`);
+        res.end(); return;
+      } catch(e) {}
+    }
+
+    // Truncation recovery — close at last complete top-level field
+    const opens = (cleaned.match(/\{/g) || []).length;
+    const closes = (cleaned.match(/\}/g) || []).length;
+    if (opens > closes) {
+      const checkpoints = [
+        '"strategic_recommendation"',
+        '"representative_patents"',
+        '"top_assignees"',
+        '"blocking_risks"',
+        '"whitespace_opportunities"'
+      ];
+      for (const cp of checkpoints) {
+        const idx = cleaned.lastIndexOf(cp);
+        if (idx > 0) {
+          const fixed = cleaned.slice(0, idx);
+          const tail = cp === '"strategic_recommendation"'
+            ? `${cp}:"See landscape summary for strategic guidance."}`
+            : `${cp}:[],"strategic_recommendation":"See landscape summary for strategic guidance."}`;
+          try {
+            const parsed = JSON.parse(fixed + tail);
+            parsed.data_source = (parsed.data_source || dataSource) + ' (partial)';
+            res.write(`data: ${JSON.stringify({ type: 'complete', data: parsed })}\n\n`);
+            res.end(); return;
+          } catch(e) {}
+        }
+      }
+    }
+
+    res.write(`data: ${JSON.stringify({ type: 'error', message: 'Could not parse AI response. Please try again.', raw: cleaned.slice(0, 200) })}\n\n`);
+    res.end();
 
   } catch(err) {
     res.write(`data: ${JSON.stringify({ type: 'error', message: err.message })}\n\n`);
