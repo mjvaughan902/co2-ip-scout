@@ -418,16 +418,6 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
       <button class="btn-p" id="patBtnTxt" onclick="runPatentCheck()">🔬 Analyse</button>
     </div>
 
-    <div id="patProgressWrap" class="pat-progress-wrap">
-      <div class="pat-progress-top">
-        <span id="patStatusMsg" class="pat-progress-msg">Initialising…</span>
-        <span id="patProgressPct" class="pat-progress-pct">0%</span>
-      </div>
-      <div class="pat-progress-track">
-        <div id="patProgressFill" class="pat-progress-fill"></div>
-      </div>
-    </div>
-
     <div id="patResults" style="margin-top:1.2rem;">
       <div class="empty" style="padding:2.5rem 1rem;">
         <div class="empty-ic">📋</div>
@@ -629,10 +619,11 @@ async function runSearch() {
   }
 
   // Step 2: Streaming AI analysis grounded in real EPO data
+  const epoCount = epoData?.total_results || 0;
   document.getElementById('resultsArea').innerHTML = `
-    <div style="padding:1rem 0;">
-      <div class="lrow"><div class="spin"></div><span class="ltxt">AI analysing ${epoData?.total_results||0} EPO patents — streaming response…</span></div>
-      <div id="streamBox" style="margin-top:1rem;padding:12px 14px;background:#f7f7f5;border-radius:8px;font-size:11px;font-family:monospace;color:#888;line-height:1.6;min-height:60px;max-height:180px;overflow-y:auto;white-space:pre-wrap;"></div>
+    <div style="padding:1.2rem 0 0.5rem;">
+      <div class="lrow" style="margin-bottom:14px;"><div class="spin"></div><span class="ltxt" id="streamStatus">Generating landscape analysis${epoCount > 0 ? ` across ${epoCount.toLocaleString()} EPO patents` : ''}…</span></div>
+      <div style="height:4px;background:#e4e2dc;border-radius:2px;overflow:hidden;"><div id="streamProgressFill" style="height:4px;background:#1D9E75;border-radius:2px;width:5%;transition:width 1.2s ease;"></div></div>
     </div>`;
 
   try {
@@ -669,9 +660,15 @@ async function runSearch() {
         try {
           const event = JSON.parse(line.slice(5).trim());
           if (event.type === 'delta') {
-            const box = document.getElementById('streamBox');
-            if (box) { box.textContent += event.text; box.scrollTop = box.scrollHeight; }
+            // advance the progress bar slowly while tokens arrive
+            const fill = document.getElementById('streamProgressFill');
+            if (fill) {
+              const cur = parseFloat(fill.style.width) || 5;
+              if (cur < 90) fill.style.width = (cur + (90 - cur) * 0.012) + '%';
+            }
           } else if (event.type === 'complete') {
+            const fill = document.getElementById('streamProgressFill');
+            if (fill) fill.style.width = '100%';
             const d = event.data;
             d._query = query;
             d._family = activeFamily?.nm || d.chemistry_family;
@@ -1224,58 +1221,93 @@ function setPatMode(mode) {
   document.getElementById('patTxtSection').style.display = mode === 'text'   ? '' : 'none';
 }
 
-// Progress milestones: message fragment → target percentage
+// Progress milestones: message fragment → target %
 const PAT_MILESTONES = [
-  ['Connecting',         5],
-  ['Fetching patent',   20],
-  ['EPO fetch',         20],
-  ['Searching EPO',     45],
-  ['prior art',         45],
-  ['Generating',        55],  // Claude starts here — crawl begins
-  ['inventiveness',     55],
+  ['Connecting',       5],
+  ['Fetching patent', 20],
+  ['EPO fetch',       20],
+  ['Searching EPO',   45],
+  ['prior art',       45],
+  ['Generating',      55],
+  ['inventiveness',   55],
 ];
-let _patProgressInterval = null;
-let _patProgressCurrent  = 0;
+let _patCrawlTimer = null;
+let _patPct = 0;
 
-function setPatProgress(pct) {
-  _patProgressCurrent = pct;
-  const fill = document.getElementById('patProgressFill');
-  const label = document.getElementById('patProgressPct');
-  if (fill)  fill.style.width = Math.min(100, pct) + '%';
-  if (label) label.textContent = Math.round(Math.min(100, pct)) + '%';
+function _patProgressHtml(pct, msg) {
+  const bar = Math.min(100, pct);
+  return `
+    <div style="padding:1.5rem 0 1rem;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+        <span style="font-size:13px;color:#555;">${msg}</span>
+        <span style="font-size:13px;font-weight:600;color:#1D9E75;">${Math.round(bar)}%</span>
+      </div>
+      <div style="height:8px;background:#e4e2dc;border-radius:4px;overflow:hidden;">
+        <div id="patProgressFill" style="height:8px;background:#1D9E75;border-radius:4px;width:${bar}%;transition:width 0.7s ease;"></div>
+      </div>
+      <div style="margin-top:10px;display:flex;gap:10px;flex-wrap:wrap;">
+        ${['EPO patent fetch','Prior art search','AI assessment'].map((step, i) => {
+          const done = pct >= [20, 45, 95][i];
+          const active = !done && pct >= [5, 20, 45][i];
+          const col = done ? '#1D9E75' : active ? '#aaa' : '#d0cec8';
+          const icon = done ? '✓' : active ? '…' : '○';
+          return `<span style="font-size:11px;color:${col};display:flex;align-items:center;gap:4px;"><span>${icon}</span>${step}</span>`;
+        }).join('')}
+      </div>
+    </div>`;
 }
 
-function startPatCrawl() {
-  if (_patProgressInterval) clearInterval(_patProgressInterval);
-  _patProgressInterval = setInterval(() => {
-    // Decelerate toward 93% — never reaches it until complete event fires
-    const gap = 93 - _patProgressCurrent;
-    if (gap > 0.2) setPatProgress(_patProgressCurrent + gap * 0.04);
-  }, 600);
+function setPatProgress(pct, msg) {
+  _patPct = pct;
+  const fill = document.getElementById('patProgressFill');
+  if (fill) {
+    fill.style.width = Math.min(100, pct) + '%';
+  } else {
+    // Progress bar not rendered yet — inject it
+    const msgEl = document.getElementById('patStatusMsg');
+    const label  = document.getElementById('patProgressPct');
+    if (msgEl) msgEl.textContent = msg || '';
+    if (label) label.textContent = Math.round(pct) + '%';
+  }
 }
 
 function stopPatCrawl() {
-  if (_patProgressInterval) { clearInterval(_patProgressInterval); _patProgressInterval = null; }
+  if (_patCrawlTimer) { clearInterval(_patCrawlTimer); _patCrawlTimer = null; }
 }
 
 function setPatStatus(msg) {
-  const wrap = document.getElementById('patProgressWrap');
-  if (!msg) {
-    stopPatCrawl();
-    if (wrap) wrap.style.display = 'none';
-    return;
-  }
-  if (wrap) wrap.style.display = 'block';
-  const msgEl = document.getElementById('patStatusMsg');
-  if (msgEl) msgEl.textContent = msg;
+  const results = document.getElementById('patResults');
+  if (!msg) { stopPatCrawl(); return; }
 
-  // Jump to milestone percentage for this message
-  const milestone = PAT_MILESTONES.find(([fragment]) => msg.toLowerCase().includes(fragment.toLowerCase()));
-  if (milestone) {
+  const milestone = PAT_MILESTONES.find(([f]) => msg.toLowerCase().includes(f.toLowerCase()));
+  const pct = milestone ? milestone[1] : _patPct;
+
+  // Render or update the progress bar inside #patResults
+  const existing = document.getElementById('patProgressFill');
+  if (!existing) {
+    // First call — inject full progress HTML
+    if (results) results.innerHTML = _patProgressHtml(pct, msg);
+  } else {
     stopPatCrawl();
-    setPatProgress(milestone[1]);
-    // Start slow crawl once Claude thinking begins
-    if (milestone[1] >= 55) startPatCrawl();
+    _patPct = pct;
+    existing.style.width = pct + '%';
+    // Update step labels by re-rendering just the inner div
+    const wrap = existing.closest('div[style*="padding:1.5rem"]');
+    if (wrap) wrap.outerHTML = _patProgressHtml(pct, msg);
+  }
+
+  // Start crawl during Claude thinking phase
+  if (milestone && milestone[1] >= 55) {
+    stopPatCrawl();
+    _patCrawlTimer = setInterval(() => {
+      const fill = document.getElementById('patProgressFill');
+      if (!fill) { stopPatCrawl(); return; }
+      const gap = 93 - _patPct;
+      if (gap > 0.3) {
+        _patPct += gap * 0.04;
+        fill.style.width = _patPct + '%';
+      }
+    }, 700);
   }
 }
 
@@ -1289,10 +1321,8 @@ async function runPatentCheck() {
   if (_patMode === 'text'   && !claimTxt) { alert('Please paste claims or describe your invention.'); return; }
 
   btn.disabled = true;
-  _patProgressCurrent = 0;
-  setPatProgress(0);
-  setPatStatus('Connecting…');
-  document.getElementById('patResults').innerHTML = '';
+  _patPct = 0;
+  document.getElementById('patResults').innerHTML = _patProgressHtml(3, 'Connecting to EPO…');
 
   const body = _patMode === 'number'
     ? { patent_number: patNum }
@@ -1327,11 +1357,9 @@ async function runPatentCheck() {
             metaData = ev.data;
           } else if (ev.type === 'complete') {
             stopPatCrawl();
-            setPatProgress(100);
-            setTimeout(() => setPatStatus(null), 400);
             renderPatentResults(ev.data, metaData);
           } else if (ev.type === 'error') {
-            setPatStatus(null);
+            stopPatCrawl();
             document.getElementById('patResults').innerHTML =
               `<div class="err">Analysis failed: ${ev.message}</div>`;
           }
@@ -1339,7 +1367,7 @@ async function runPatentCheck() {
       }
     }
   } catch(e) {
-    setPatStatus(null);
+    stopPatCrawl();
     document.getElementById('patResults').innerHTML = `<div class="err">Error: ${e.message}</div>`;
   }
   btn.disabled = false;
