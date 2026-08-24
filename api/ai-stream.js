@@ -191,6 +191,10 @@ Return this JSON with ALL fields populated with real, specific content for this 
   res.setHeader('X-Accel-Buffering', 'no');
   res.flushHeaders();
 
+  // Keep the SSE connection alive while Claude processes — without pings,
+  // Vercel's proxy drops silent connections after ~20s before the first token arrives.
+  const keepAlive = setInterval(() => { res.write(': ping\n\n'); }, 5000);
+
   try {
     const response = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
@@ -209,6 +213,7 @@ Return this JSON with ALL fields populated with real, specific content for this 
     });
 
     if (!response.ok) {
+      clearInterval(keepAlive);
       const err = await response.text();
       res.write(`data: ${JSON.stringify({ type: 'error', message: `Anthropic error ${response.status}: ${err.slice(0, 200)}` })}\n\n`);
       res.end();
@@ -236,10 +241,12 @@ Return this JSON with ALL fields populated with real, specific content for this 
         }
       }
     } catch(streamErr) {
+      clearInterval(keepAlive);
       res.write(`data: ${JSON.stringify({ type: 'error', message: streamErr.message })}\n\n`);
       res.end(); return;
     }
 
+    clearInterval(keepAlive);
     const cleaned = fullText.replace(/```json|```/g, '').trim();
 
     // Try direct parse
@@ -291,6 +298,7 @@ Return this JSON with ALL fields populated with real, specific content for this 
     res.end();
 
   } catch(err) {
+    clearInterval(keepAlive);
     res.write(`data: ${JSON.stringify({ type: 'error', message: err.message })}\n\n`);
     res.end();
   }
